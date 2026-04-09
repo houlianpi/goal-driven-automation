@@ -9,6 +9,8 @@ from enum import Enum
 import json
 import hashlib
 
+from src.time_utils import parse_datetime, utc_now
+
 
 class CaseType(Enum):
     """Types of reusable cases."""
@@ -26,7 +28,7 @@ class Case:
     success_count: int = 0
     failure_count: int = 0
     last_used: Optional[datetime] = None
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=utc_now)
     tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
     
@@ -60,8 +62,8 @@ class Case:
             pattern=data["pattern"],
             success_count=data.get("success_count", 0),
             failure_count=data.get("failure_count", 0),
-            last_used=datetime.fromisoformat(data["last_used"]) if data.get("last_used") else None,
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else datetime.utcnow(),
+            last_used=parse_datetime(data["last_used"]) if data.get("last_used") else None,
+            created_at=parse_datetime(data["created_at"]) if data.get("created_at") else utc_now(),
             tags=data.get("tags", []),
             metadata=data.get("metadata", {}),
         )
@@ -78,7 +80,7 @@ class CaseMemory:
     """
     
     def __init__(self, storage_path: Optional[Path] = None):
-        self.storage_path = storage_path or Path("memory/cases.json")
+        self.storage_path = storage_path or Path("data/memory/cases.json")
         self._cases: Dict[str, Case] = {}
         self._load()
     
@@ -116,7 +118,7 @@ class CaseMemory:
                 case.success_count += 1
             else:
                 case.failure_count += 1
-            case.last_used = datetime.utcnow()
+            case.last_used = utc_now()
             self._save()
     
     def find_similar(self, pattern: Dict[str, Any], case_type: Optional[CaseType] = None, min_confidence: float = 0.5) -> List[Case]:
@@ -153,7 +155,7 @@ class CaseMemory:
         existing = self._cases.get(case_id)
         if existing:
             existing.success_count += 1
-            existing.last_used = datetime.utcnow()
+            existing.last_used = utc_now()
             self._save()
             return existing
         

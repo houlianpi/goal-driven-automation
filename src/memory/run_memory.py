@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 import json
 
+from src.time_utils import utc_now
+
 
 @dataclass
 class Decision:
@@ -14,7 +16,7 @@ class Decision:
     step_id: str
     decision_type: str  # retry, skip, replan, abort
     reason: str
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=utc_now)
     context: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -35,7 +37,7 @@ class RunState:
     current_step: int = 0
     total_steps: int = 0
     status: str = "running"  # running, paused, completed, failed
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=utc_now)
     decisions: List[Decision] = field(default_factory=list)
     context: Dict[str, Any] = field(default_factory=dict)
     
@@ -63,7 +65,7 @@ class RunMemory:
     """
     
     def __init__(self, storage_dir: Optional[Path] = None):
-        self.storage_dir = storage_dir or Path("runs")
+        self.storage_dir = storage_dir or Path("data/runs")
         self._current_run: Optional[RunState] = None
         self._recent_decisions: List[Decision] = []
         self._max_recent = 50

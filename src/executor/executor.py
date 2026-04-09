@@ -5,10 +5,12 @@ import json
 import os
 import subprocess
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import uuid
+
+from src.evidence.types import CLICommand, RunEvidence, RunStatus, StepEvidence, StepError, StepStatus, FailureClassification
+from src.time_utils import utc_now
 
 
 class ExecutionError(Exception):
@@ -24,6 +26,7 @@ class StepResult:
         step_id: str,
         success: bool,
         command: str,
+        argv: Optional[List[str]] = None,
         stdout: str = "",
         stderr: str = "",
         return_code: int = 0,
@@ -34,6 +37,7 @@ class StepResult:
         self.step_id = step_id
         self.success = success
         self.command = command
+        self.argv = argv or []
         self.stdout = stdout
         self.stderr = stderr
         self.return_code = return_code
@@ -46,6 +50,7 @@ class StepResult:
             "step_id": self.step_id,
             "success": self.success,
             "command": self.command,
+            "argv": self.argv,
             "stdout": self.stdout,
             "stderr": self.stderr,
             "return_code": self.return_code,
@@ -61,7 +66,7 @@ class PlanResult:
     def __init__(self, plan_id: str, run_id: str):
         self.plan_id = plan_id
         self.run_id = run_id
-        self.start_time = datetime.utcnow().isoformat()
+        self.start_time = utc_now().isoformat()
         self.end_time: Optional[str] = None
         self.success = True
         self.step_results: List[StepResult] = []
@@ -73,7 +78,7 @@ class PlanResult:
             self.success = False
     
     def finalize(self, failure_reason: Optional[str] = None):
-        self.end_time = datetime.utcnow().isoformat()
+        self.end_time = utc_now().isoformat()
         self.failure_reason = failure_reason
     
     def to_dict(self) -> Dict[str, Any]:
@@ -94,12 +99,12 @@ class Executor:
     def __init__(self, runs_dir: Optional[Path] = None, timeout_ms: int = 120000):
         """Initialize executor."""
         if runs_dir is None:
-            runs_dir = Path(__file__).parent.parent.parent / "runs"
+            runs_dir = Path(__file__).parent.parent.parent / "data" / "runs"
         self.runs_dir = runs_dir
         self.timeout_ms = timeout_ms
         self.mac_cli = os.environ.get("FSQ_MAC_CLI", "mac")
     
-    def execute_command(self, command: str, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
+    def execute_command(self, command: List[str], timeout_ms: Optional[int] = None) -> Dict[str, Any]:
         """
         Execute a single CLI command.
         
@@ -112,7 +117,7 @@ class Executor:
         try:
             result = subprocess.run(
                 command,
-                shell=True,
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -153,13 +158,15 @@ class Executor:
         """
         step_id = step.get("step_id", "unknown")
         command = step.get("command")
-        
-        if not command:
+        argv = step.get("argv")
+
+        if not command or not argv:
             return StepResult(
                 step_id=step_id,
                 success=False,
-                command="",
-                error="Step missing 'command' field - not compiled?",
+                command=command or "",
+                argv=argv or [],
+                error="Step missing 'command' or 'argv' field - not compiled?",
             )
         
         # Execute with retry
@@ -170,7 +177,7 @@ class Executor:
         
         last_result = None
         for attempt in range(max_attempts):
-            result = self.execute_command(command)
+            result = self.execute_command(argv)
             last_result = result
             
             if result["return_code"] == 0:
@@ -178,6 +185,7 @@ class Executor:
                     step_id=step_id,
                     success=True,
                     command=command,
+                    argv=argv,
                     stdout=result["stdout"],
                     stderr=result["stderr"],
                     return_code=result["return_code"],
@@ -201,6 +209,7 @@ class Executor:
             step_id=step_id,
             success=False,
             command=command,
+            argv=argv,
             stdout=last_result.get("stdout", ""),
             stderr=last_result.get("stderr", ""),
             return_code=last_result.get("return_code", -1),
@@ -245,6 +254,53 @@ class Executor:
         self._save_evidence(result)
         
         return result
+
+    def execute(self, plan: Dict[str, Any], run_id: Optional[str] = None) -> RunEvidence:
+        """Execute a compiled plan and return unified run evidence."""
+        plan_result = self.execute_plan(plan)
+        evidence = RunEvidence(plan_id=plan.get("plan_id", "unknown"), run_id=run_id or plan_result.run_id)
+
+        for step_result, step in zip(plan_result.step_results, plan.get("steps", [])):
+            error = None
+            if not step_result.success:
+                error = StepError(
+                    type="ExecutionError",
+                    message=step_result.error or step_result.stderr or "Step execution failed",
+                    classification=self._classify_failure(step_result),
+                )
+
+            step_evidence = StepEvidence(
+                step_id=step_result.step_id,
+                action=step.get("action", "unknown"),
+                status=StepStatus.SUCCESS if step_result.success else StepStatus.FAILURE,
+                duration_ms=step_result.duration_ms,
+                cli_command=CLICommand(
+                    command=step_result.argv,
+                    exit_code=step_result.return_code,
+                    stdout=step_result.stdout,
+                    stderr=step_result.stderr,
+                    duration_ms=step_result.duration_ms,
+                ),
+                error=error,
+                retry_count=max(step_result.evidence.get("attempt", 1) - 1, 0),
+            )
+            evidence.add_step(step_evidence)
+
+        evidence.finalize()
+        if not plan_result.success and evidence.status == RunStatus.SUCCESS:
+            evidence.status = RunStatus.FAILURE
+        return evidence
+
+    def _classify_failure(self, step_result: StepResult) -> FailureClassification:
+        """Map executor step failures to coarse evidence classifications."""
+        text = f"{step_result.stderr} {step_result.error}".lower()
+        if "timed out" in text or step_result.return_code == -1:
+            return FailureClassification.ENVIRONMENT_FAILURE
+        if "not found" in text or step_result.return_code == 127:
+            return FailureClassification.CAPABILITY_UNAVAILABLE
+        if "permission" in text or "denied" in text:
+            return FailureClassification.PRECONDITION_MISSING
+        return FailureClassification.ENVIRONMENT_FAILURE
     
     def _save_evidence(self, result: PlanResult):
         """Save execution evidence to runs directory."""
@@ -256,7 +312,7 @@ class Executor:
             json.dump(result.to_dict(), f, indent=2)
 
 
-def execute_command(command: str) -> Dict[str, Any]:
+def execute_command(command: List[str]) -> Dict[str, Any]:
     """Execute a single CLI command."""
     executor = Executor()
     return executor.execute_command(command)

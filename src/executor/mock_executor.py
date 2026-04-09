@@ -3,7 +3,6 @@ Mock Executor - Simulates execution for testing without fsq-mac CLI.
 """
 import random
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 import uuid
@@ -13,13 +12,14 @@ from src.evidence.types import (
     RunEvidence, StepEvidence, StepStatus, RunStatus,
     CLICommand, StepError, FailureClassification, Artifact
 )
+from src.time_utils import utc_now
 
 
 class MockExecutor:
     """Simulates plan execution for testing."""
     
     def __init__(self, runs_dir: Optional[Path] = None, failure_rate: float = 0.3):
-        self.runs_dir = runs_dir or Path("runs")
+        self.runs_dir = runs_dir or Path("data/runs")
         self.failure_rate = failure_rate
         self.forced_failures: Dict[str, str] = {}  # step_id -> error_type
     
@@ -68,7 +68,7 @@ class MockExecutor:
         action = step.get("action", "unknown")
         params = step.get("params", step.get("args", {}))
         
-        started_at = datetime.utcnow()
+        started_at = utc_now()
         time.sleep(0.1)  # Simulate execution time
         
         # Check for forced failure
@@ -81,13 +81,13 @@ class MockExecutor:
             return self._create_failure(step_id, action, error_type, started_at)
         
         # Success
-        finished_at = datetime.utcnow()
+        finished_at = utc_now()
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
         
         # Simulate CLI command
         command = self._build_command(action, params)
         cli = CLICommand(
-            command=command.split(),
+            command=command,
             exit_code=0,
             stdout=f"Success: {action} completed",
             stderr="",
@@ -114,9 +114,9 @@ class MockExecutor:
             artifacts=artifacts,
         )
     
-    def _create_failure(self, step_id: str, action: str, error_type: str, started_at: datetime) -> StepEvidence:
+    def _create_failure(self, step_id: str, action: str, error_type: str, started_at):
         """Create a failure evidence."""
-        finished_at = datetime.utcnow()
+        finished_at = utc_now()
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
         
         error_map = {
@@ -153,22 +153,32 @@ class MockExecutor:
             error=error,
         )
     
-    def _build_command(self, action: str, params: Dict) -> str:
+    def _build_command(self, action: str, params: Dict) -> List[str]:
         """Build simulated CLI command."""
+        if action == "launch":
+            return ["mac", "app", "launch", params.get("app", "app")]
         if action == "launch_app":
-            return f"mac app launch {params.get('bundle_id', 'app')}"
+            return ["mac", "app", "launch", params.get("bundle_id", "app")]
+        elif action == "shortcut":
+            keys = params.get("keys", [])
+            return ["mac", "input", "hotkey", *keys]
         elif action == "hotkey":
             keys = params.get("keys", [])
-            return f"mac input hotkey {'+'.join(keys)}"
+            return ["mac", "input", "hotkey", *keys]
+        elif action == "type":
+            return ["mac", "input", "type", params.get("text", "")]
         elif action == "assert_visible":
-            return f"mac assert visible {params.get('locator', 'element')}"
-        return f"mac {action}"
+            return ["mac", "assert", "visible", params.get("locator", "element")]
+        elif action == "assert":
+            locator = params.get("locator", params.get("condition", "element"))
+            return ["mac", "assert", "visible", locator]
+        return ["mac", action]
     
     def _log_step(self, run_dir: Path, step: StepEvidence):
         """Log step execution."""
         log_path = run_dir / "logs" / "execution.jsonl"
         entry = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": utc_now().isoformat(),
             "step_id": step.step_id,
             "action": step.action,
             "status": step.status.value,

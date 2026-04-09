@@ -1,12 +1,14 @@
 """Unit tests for Pipeline."""
 import pytest
 import tempfile
+import inspect
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 
 from src.pipeline.goal_parser import GoalParser, GoalType
 from src.pipeline.plan_generator import PlanGenerator
 from src.pipeline.pipeline import Pipeline, PipelineStage
+from src.executor.mock_executor import MockExecutor
 
 
 class TestGoalParser:
@@ -48,34 +50,58 @@ class TestPlanGenerator:
         
         assert plan["plan_id"].startswith("plan-")
         assert plan["app"] == "Microsoft Edge"
+        assert plan["goal"] == "Open Edge"
         assert len(plan["steps"]) >= 1
-        assert plan["steps"][0]["action"] == "launch_app"
-    
+        assert plan["steps"][0]["action"] == "launch"
+
     def test_generate_composite_plan(self, generator):
         parser = GoalParser()
         goal = parser.parse("Open Edge and create new tab")
         plan = generator.generate(goal)
-        
+
         actions = [s["action"] for s in plan["steps"]]
-        assert "launch_app" in actions
-        assert "keyboard_shortcut" in actions
+        assert "launch" in actions
+        assert "shortcut" in actions
+
+    def test_generated_plan_matches_schema_contract(self, generator):
+        from src.schema.validator import SchemaValidator
+
+        parser = GoalParser()
+        goal = parser.parse("Open Edge and create new tab")
+        plan = generator.generate(goal)
+
+        is_valid, errors = SchemaValidator().validate_plan(plan)
+        assert is_valid is True, errors
 
 
 class TestPipeline:
+    def test_pipeline_module_has_single_pipeline_class_definition(self):
+        import src.pipeline.pipeline as pipeline_module
+
+        source = inspect.getsource(pipeline_module)
+        assert source.count("class Pipeline:") == 1
+
     def test_dry_run(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create minimal registry
             registry_dir = Path(tmpdir) / "registry"
             registry_dir.mkdir()
             (registry_dir / "actions.yaml").write_text("""
-version: "1.0"
+schema_version: "1.0"
 actions:
   launch_app:
-    cli_template: "mac app launch {app_name}"
-  keyboard_shortcut:
-    cli_template: "mac keyboard shortcut {shortcut}"
-  assert_element:
-    cli_template: "mac assert {condition}"
+    args:
+      bundle_id: {type: string, required: true}
+    compile_to: mac app launch {bundle_id}
+  hotkey:
+    args:
+      keys: {type: array, required: true}
+    compile_to: mac input hotkey {keys}
+  assert_visible:
+    args:
+      locator: {type: string, required: true}
+      strategy: {type: string, required: false, default: accessibility_id}
+    compile_to: mac assert visible \"{locator}\" --strategy {strategy}
 """)
             
             pipeline = Pipeline(base_dir=Path(tmpdir))
@@ -94,7 +120,9 @@ actions:
 version: "1.0"
 actions:
   launch_app:
-    cli_template: "mac app launch {app_name}"
+    args:
+      bundle_id: {type: string, required: true}
+    compile_to: mac app launch {bundle_id}
 """)
             
             pipeline = Pipeline(base_dir=Path(tmpdir))
@@ -104,3 +132,63 @@ actions:
             assert PipelineStage.PARSE_GOAL in stages
             assert PipelineStage.GENERATE_PLAN in stages
             assert PipelineStage.COMPILE in stages
+
+    def test_run_executes_compiled_plan(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry_dir = Path(tmpdir) / "registry"
+            registry_dir.mkdir()
+            (registry_dir / "actions.yaml").write_text(
+                """
+schema_version: "1.0"
+actions:
+  launch_app:
+    args:
+      bundle_id: {type: string, required: true}
+    compile_to: mac app launch {bundle_id}
+"""
+            )
+
+            pipeline = Pipeline(base_dir=Path(tmpdir))
+            compiled_plan = {
+                "plan_id": "plan-compiled",
+                "steps": [{"step_id": "s1", "command": "echo compiled"}],
+            }
+
+            with patch.object(pipeline, "_compile", return_value=(MagicMock(success=True), compiled_plan)):
+                with patch.object(pipeline, "_execute", return_value=(MagicMock(success=False), None)) as execute_mock:
+                    pipeline.run("Open Edge")
+
+            execute_mock.assert_called_once_with(compiled_plan, ANY)
+
+    def test_pipeline_accepts_mock_executor_for_runtime_path(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry_dir = Path(tmpdir) / "registry"
+            registry_dir.mkdir()
+            (registry_dir / "actions.yaml").write_text(
+                """
+schema_version: "1.0"
+actions:
+  launch_app:
+    args:
+      bundle_id: {type: string, required: true}
+    compile_to: mac app launch {bundle_id}
+    expected_evidence: [process_running]
+    default_retry: {max: 1}
+  assert_visible:
+    args:
+      locator: {type: string, required: true}
+      strategy: {type: string, required: false, default: accessibility_id}
+    compile_to: mac assert visible "{locator}" --strategy {strategy}
+    expected_evidence: [assertion_result]
+    default_retry: {max: 1}
+"""
+            )
+
+            pipeline = Pipeline(base_dir=Path(tmpdir))
+            pipeline.executor = MockExecutor(runs_dir=Path(tmpdir) / "data" / "runs", failure_rate=0.0)
+
+            result = pipeline.run("Open Edge")
+
+            assert result.evidence is not None
+            assert result.evidence.plan_id == result.plan["plan_id"]
+            assert result.final_status in {"success", "partial", "failed", "recovered"}

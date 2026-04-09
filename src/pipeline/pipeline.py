@@ -17,6 +17,7 @@ from src.evidence.types import RunEvidence, RunStatus
 from src.evaluator.evaluator import Evaluator, EvaluationResult
 from src.repair.repair_loop import RepairLoop, RepairResult
 from src.memory.evolution import EvolutionEngine
+from src.time_utils import utc_now
 
 
 class PipelineStage(Enum):
@@ -98,7 +99,7 @@ class Pipeline:
         self.plan_generator = PlanGenerator()
         self.compiler = Compiler(self.base_dir / "registry" / "actions.yaml")
         self.executor = Executor()
-        self.evidence_storage = EvidenceStorage(self.base_dir / "runs")
+        self.evidence_storage = EvidenceStorage(self.base_dir / "data" / "runs")
         self.evaluator = Evaluator()
         self.repair_loop = RepairLoop()
         self.evolution = EvolutionEngine(self.base_dir)
@@ -145,10 +146,10 @@ class Pipeline:
                 return result
             
             # Stage 4: Execute
-            stage_result, evidence = self._execute(plan, run_id)
+            stage_result, evidence = self._execute(compiled, run_id)
             result.stages.append(stage_result)
             result.evidence = evidence
-            result.artifacts_dir = f"runs/{run_id}"
+            result.artifacts_dir = f"data/runs/{run_id}"
             
             if not stage_result.success:
                 # Continue to evaluation even on failure
@@ -196,10 +197,10 @@ class Pipeline:
     
     def _parse_goal(self, goal_text: str) -> tuple:
         """Stage 1: Parse goal."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             goal = self.goal_parser.parse(goal_text)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.PARSE_GOAL,
                 success=True,
@@ -207,7 +208,7 @@ class Pipeline:
                 duration_ms=duration,
             ), goal
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.PARSE_GOAL,
                 success=False,
@@ -217,10 +218,10 @@ class Pipeline:
     
     def _generate_plan(self, goal: Goal) -> tuple:
         """Stage 2: Generate plan."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             plan = self.plan_generator.generate(goal)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.GENERATE_PLAN,
                 success=True,
@@ -228,7 +229,7 @@ class Pipeline:
                 duration_ms=duration,
             ), plan
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.GENERATE_PLAN,
                 success=False,
@@ -238,10 +239,10 @@ class Pipeline:
     
     def _compile(self, plan: Dict[str, Any]) -> tuple:
         """Stage 3: Compile plan."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             compiled = self.compiler.compile_plan(plan)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             
             # Check for validation errors
             errors = [s for s in compiled.get("steps", []) if s.get("error")]
@@ -260,7 +261,7 @@ class Pipeline:
                 duration_ms=duration,
             ), compiled
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.COMPILE,
                 success=False,
@@ -270,10 +271,10 @@ class Pipeline:
     
     def _execute(self, plan: Dict[str, Any], run_id: str) -> tuple:
         """Stage 4: Execute plan."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             evidence = self.executor.execute(plan, run_id)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             
             # Save evidence
             self.evidence_storage.save_evidence(evidence)
@@ -287,7 +288,7 @@ class Pipeline:
                 duration_ms=duration,
             ), evidence
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.EXECUTE,
                 success=False,
@@ -297,10 +298,10 @@ class Pipeline:
     
     def _evaluate(self, evidence: RunEvidence) -> tuple:
         """Stage 5: Evaluate results."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             evaluation = self.evaluator.evaluate(evidence)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.EVALUATE,
                 success=True,
@@ -308,7 +309,7 @@ class Pipeline:
                 duration_ms=duration,
             ), evaluation
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.EVALUATE,
                 success=False,
@@ -318,10 +319,10 @@ class Pipeline:
     
     def _repair(self, evidence: RunEvidence) -> tuple:
         """Stage 6: Attempt repairs."""
-        start = datetime.utcnow()
+        start = utc_now()
         try:
             repair_result = self.repair_loop.run(evidence)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             
             success = repair_result.outcome.value in ["recovered", "partial"]
             return StageResult(
@@ -331,7 +332,7 @@ class Pipeline:
                 duration_ms=duration,
             ), repair_result
         except Exception as e:
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            duration = int((utc_now() - start).total_seconds() * 1000)
             return StageResult(
                 stage=PipelineStage.REPAIR,
                 success=False,
@@ -354,130 +355,4 @@ class Pipeline:
             with open(result_path, "w") as f:
                 json.dump(result.to_dict(), f, indent=2)
         
-        return result
-
-class Pipeline:
-    def __init__(self, base_dir: Optional[Path] = None, mac_cli: str = "mac"):
-        self.base_dir = base_dir or Path(".")
-        self.mac_cli = mac_cli
-        self.goal_parser = GoalParser()
-        self.plan_generator = PlanGenerator()
-        self.compiler = Compiler(self.base_dir / "registry" / "actions.yaml")
-        self.executor = Executor()
-        self.evidence_storage = EvidenceStorage(self.base_dir / "runs")
-        self.evaluator = Evaluator()
-        self.repair_loop = RepairLoop()
-        self.evolution = EvolutionEngine(self.base_dir)
-    
-    def run(self, goal_text: str, dry_run: bool = False) -> PipelineResult:
-        import uuid
-        run_id = f"run-{uuid.uuid4().hex[:8]}"
-        result = PipelineResult(run_id=run_id)
-        try:
-            stage_result, goal = self._parse_goal(goal_text)
-            result.stages.append(stage_result)
-            if not stage_result.success: return self._finalize(result, "parse_failed")
-            result.goal = goal
-            stage_result, plan = self._generate_plan(goal)
-            result.stages.append(stage_result)
-            if not stage_result.success: return self._finalize(result, "plan_failed")
-            result.plan = plan
-            stage_result, compiled = self._compile(plan)
-            result.stages.append(stage_result)
-            if not stage_result.success: return self._finalize(result, "compile_failed")
-            if dry_run:
-                result.success = True
-                result.final_status = "dry_run_complete"
-                return result
-            stage_result, evidence = self._execute(plan, run_id)
-            result.stages.append(stage_result)
-            result.evidence = evidence
-            result.artifacts_dir = f"runs/{run_id}"
-            stage_result, evaluation = self._evaluate(evidence)
-            result.stages.append(stage_result)
-            result.evaluation = evaluation
-            if evaluation and evaluation.failed_steps > 0:
-                stage_result, repair_result = self._repair(evidence)
-                result.stages.append(stage_result)
-                result.repair_result = repair_result
-                if repair_result and repair_result.repaired_evidence:
-                    result.evidence = repair_result.repaired_evidence
-            if result.evidence:
-                if result.evidence.status == RunStatus.SUCCESS:
-                    result.success, result.final_status = True, "success"
-                elif result.repair_result and result.repair_result.outcome.value == "recovered":
-                    result.success, result.final_status = True, "recovered"
-                elif result.evidence.status == RunStatus.PARTIAL:
-                    result.success, result.final_status = False, "partial"
-                else:
-                    result.success, result.final_status = False, "failed"
-            return self._finalize(result, result.final_status)
-        except Exception as e:
-            result.stages.append(StageResult(stage=PipelineStage.FINALIZE, success=False, error=str(e)))
-            result.final_status = "error"
-            return result
-
-    def _parse_goal(self, goal_text: str) -> tuple:
-        start = datetime.utcnow()
-        try:
-            goal = self.goal_parser.parse(goal_text)
-            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
-            return StageResult(stage=PipelineStage.PARSE_GOAL, success=True, data=goal.to_dict(), duration_ms=duration), goal
-        except Exception as e:
-            return StageResult(stage=PipelineStage.PARSE_GOAL, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _generate_plan(self, goal: Goal) -> tuple:
-        start = datetime.utcnow()
-        try:
-            plan = self.plan_generator.generate(goal)
-            return StageResult(stage=PipelineStage.GENERATE_PLAN, success=True, data=plan, duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), plan
-        except Exception as e:
-            return StageResult(stage=PipelineStage.GENERATE_PLAN, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _compile(self, plan: Dict[str, Any]) -> tuple:
-        start = datetime.utcnow()
-        try:
-            compiled = self.compiler.compile_plan(plan)
-            errors = [s for s in compiled.get("steps", []) if s.get("error")]
-            if errors:
-                return StageResult(stage=PipelineStage.COMPILE, success=False, error=f"Compilation errors: {errors}", duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-            return StageResult(stage=PipelineStage.COMPILE, success=True, data=compiled, duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), compiled
-        except Exception as e:
-            return StageResult(stage=PipelineStage.COMPILE, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _execute(self, plan: Dict[str, Any], run_id: str) -> tuple:
-        start = datetime.utcnow()
-        try:
-            evidence = self.executor.execute(plan, run_id)
-            self.evidence_storage.save_evidence(evidence)
-            self.evidence_storage.save_input_plan(run_id, plan)
-            return StageResult(stage=PipelineStage.EXECUTE, success=evidence.status == RunStatus.SUCCESS, data={"run_id": run_id, "status": evidence.status.value}, duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), evidence
-        except Exception as e:
-            return StageResult(stage=PipelineStage.EXECUTE, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _evaluate(self, evidence: RunEvidence) -> tuple:
-        start = datetime.utcnow()
-        try:
-            evaluation = self.evaluator.evaluate(evidence)
-            return StageResult(stage=PipelineStage.EVALUATE, success=True, data=evaluation.to_dict(), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), evaluation
-        except Exception as e:
-            return StageResult(stage=PipelineStage.EVALUATE, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _repair(self, evidence: RunEvidence) -> tuple:
-        start = datetime.utcnow()
-        try:
-            repair_result = self.repair_loop.run(evidence)
-            return StageResult(stage=PipelineStage.REPAIR, success=repair_result.outcome.value in ["recovered", "partial"], data=repair_result.to_dict(), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), repair_result
-        except Exception as e:
-            return StageResult(stage=PipelineStage.REPAIR, success=False, error=str(e), duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None
-
-    def _finalize(self, result: PipelineResult, status: str) -> PipelineResult:
-        result.final_status = status
-        if result.evidence:
-            self.evolution.process_run_completion(result.evidence, result.repair_result)
-        if result.artifacts_dir:
-            result_path = self.base_dir / result.artifacts_dir / "pipeline_result.json"
-            result_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(result_path, "w") as f:
-                json.dump(result.to_dict(), f, indent=2)
         return result

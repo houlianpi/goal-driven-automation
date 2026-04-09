@@ -35,8 +35,8 @@
         "exit_code": 0
       },
       "evidence": {
-        "screenshot_before": "runs/run-a1b2c3d4/screenshots/step-3-before.png",
-        "screenshot_after": "runs/run-a1b2c3d4/screenshots/step-3-after.png"
+        "screenshot_before": "data/runs/run-a1b2c3d4/screenshots/step-3-before.png",
+        "screenshot_after": "data/runs/run-a1b2c3d4/screenshots/step-3-after.png"
       }
     }
   ],
@@ -51,8 +51,8 @@
     }
   ],
   "artifacts": {
-    "screenshots_dir": "runs/run-a1b2c3d4/screenshots/",
-    "ui_trees_dir": "runs/run-a1b2c3d4/ui_trees/",
-    "logs_dir": "runs/run-a1b2c3d4/logs/"
+    "screenshots_dir": "data/runs/run-a1b2c3d4/screenshots/",
+    "ui_trees_dir": "data/runs/run-a1b2c3d4/ui_trees/",
+    "logs_dir": "data/runs/run-a1b2c3d4/logs/"
   }
 }

@@ -4,11 +4,13 @@ Evidence Storage - Persists run evidence to disk.
 import json
 import platform
 import socket
-from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .types import Environment, RunEvidence
+from .types import Artifact, AssertionResult, CLICommand, FailureClassification, RepairAttempt, StepError, StepEvidence, StepStatus, RunStatus
+from src.time_utils import parse_datetime, utc_now
 
 
 class EvidenceStorage:
@@ -17,7 +19,7 @@ class EvidenceStorage:
     def __init__(self, runs_dir: Optional[Path] = None):
         """Initialize storage with runs directory."""
         if runs_dir is None:
-            runs_dir = Path(__file__).parent.parent.parent / "runs"
+            runs_dir = Path(__file__).parent.parent.parent / "data" / "runs"
         self.runs_dir = runs_dir
         self.runs_dir.mkdir(parents=True, exist_ok=True)
     
@@ -42,7 +44,7 @@ class EvidenceStorage:
         
         # Capture environment
         evidence.environment = self._capture_environment()
-        evidence.artifacts_dir = f"runs/{evidence.run_id}"
+        evidence.artifacts_dir = f"data/runs/{evidence.run_id}"
         
         return evidence
     
@@ -112,11 +114,71 @@ class EvidenceStorage:
         with open(evidence_path, "r") as f:
             data = json.load(f)
         
-        # Convert back to RunEvidence (simplified)
+        environment = None
+        if data.get("environment"):
+            environment = Environment(**data["environment"])
+
+        steps = []
+        for step_data in data.get("steps", []):
+            cli_command = None
+            if step_data.get("cli_command"):
+                cli_command = CLICommand(**step_data["cli_command"])
+
+            error = None
+            if step_data.get("error"):
+                error_data = step_data["error"].copy()
+                error_data["classification"] = FailureClassification(error_data["classification"])
+                error = StepError(**error_data)
+
+            artifacts = [
+                Artifact(
+                    type=artifact["type"],
+                    path=artifact["path"],
+                    captured_at=parse_datetime(artifact["captured_at"]),
+                    metadata=artifact.get("metadata", {}),
+                )
+                for artifact in step_data.get("artifacts", [])
+            ]
+
+            steps.append(
+                StepEvidence(
+                    step_id=step_data["step_id"],
+                    action=step_data["action"],
+                    status=StepStatus(step_data["status"]),
+                    started_at=parse_datetime(step_data["started_at"]),
+                    finished_at=parse_datetime(step_data["finished_at"]) if step_data.get("finished_at") else None,
+                    duration_ms=step_data.get("duration_ms", 0),
+                    cli_command=cli_command,
+                    error=error,
+                    artifacts=artifacts,
+                    retry_count=step_data.get("retry_count", 0),
+                )
+            )
+
+        assertions = [
+            AssertionResult(**assertion_data)
+            for assertion_data in data.get("assertions", [])
+        ]
+
+        repairs = [
+            RepairAttempt(**repair_data)
+            for repair_data in data.get("repairs", [])
+        ]
+
         evidence = RunEvidence(
             evidence_id=data.get("evidence_id", ""),
             plan_id=data.get("plan_id", ""),
             run_id=data.get("run_id", run_id),
+            version=data.get("version", "1.0.0"),
+            status=RunStatus(data.get("status", RunStatus.SUCCESS.value)),
+            started_at=parse_datetime(data["started_at"]) if data.get("started_at") else utc_now(),
+            finished_at=parse_datetime(data["finished_at"]) if data.get("finished_at") else None,
+            duration_ms=data.get("duration_ms", 0),
+            environment=environment,
+            steps=steps,
+            assertions=assertions,
+            repairs=repairs,
+            artifacts_dir=data.get("artifacts", {}).get("screenshots_dir", "").removesuffix("/screenshots/"),
         )
         return evidence
     
@@ -169,9 +231,7 @@ class EvidenceStorage:
             Number of runs deleted
         """
         import shutil
-        from datetime import timedelta
-        
-        cutoff = datetime.utcnow() - timedelta(days=keep_days)
+        cutoff = utc_now() - timedelta(days=keep_days)
         deleted = 0
         
         for run_dir in self.runs_dir.iterdir():
@@ -184,7 +244,7 @@ class EvidenceStorage:
                     data = json.load(f)
                 started_at = data.get("started_at")
                 if started_at:
-                    run_time = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+                    run_time = parse_datetime(started_at.replace("Z", "+00:00"))
                     if run_time < cutoff:
                         shutil.rmtree(run_dir)
                         deleted += 1

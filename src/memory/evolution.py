@@ -11,6 +11,7 @@ from .case_memory import CaseMemory, Case, CaseType
 from .rule_memory import RuleMemory, RuleType
 from src.evidence.types import RunEvidence, StepEvidence, StepStatus
 from src.repair.repair_loop import RepairResult, RepairOutcome
+from src.time_utils import utc_now
 
 
 @dataclass
@@ -41,8 +42,8 @@ class EvolutionEngine:
     
     def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = base_dir or Path(".")
-        self.run_memory = RunMemory(self.base_dir / "runs")
-        self.case_memory = CaseMemory(self.base_dir / "memory" / "cases.json")
+        self.run_memory = RunMemory(self.base_dir / "data" / "runs")
+        self.case_memory = CaseMemory(self.base_dir / "data" / "memory" / "cases.json")
         self.rule_memory = RuleMemory(self.base_dir)
         self._events: List[EvolutionEvent] = []
     
@@ -75,7 +76,7 @@ class EvolutionEngine:
                     if case:
                         event = EvolutionEvent(
                             event_type="case_promoted",
-                            timestamp=datetime.utcnow(),
+                            timestamp=utc_now(),
                             details={
                                 "case_id": case.case_id,
                                 "run_id": evidence.run_id,
@@ -120,7 +121,7 @@ class EvolutionEngine:
         existing = self.case_memory.get_case(case.case_id)
         if existing:
             existing.success_count += 1
-            existing.last_used = datetime.utcnow()
+            existing.last_used = utc_now()
         else:
             self.case_memory.add_case(case)
     

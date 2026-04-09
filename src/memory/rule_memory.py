@@ -10,6 +10,8 @@ import json
 import yaml
 import shutil
 
+from src.time_utils import parse_datetime, utc_now
+
 
 class RuleType(Enum):
     """Types of rules."""
@@ -66,8 +68,8 @@ class RuleMemory:
     
     def __init__(self, base_dir: Optional[Path] = None):
         self.base_dir = base_dir or Path(".")
-        self.versions_dir = self.base_dir / "memory" / "rule_versions"
-        self.manifest_path = self.base_dir / "memory" / "rules_manifest.json"
+        self.versions_dir = self.base_dir / "data" / "memory" / "rule_versions"
+        self.manifest_path = self.base_dir / "data" / "memory" / "rules_manifest.json"
         self._rules: Dict[str, Rule] = {}
         self._load_manifest()
     
@@ -84,7 +86,7 @@ class RuleMemory:
                         versions=[
                             RuleVersion(
                                 version=v["version"],
-                                created_at=datetime.fromisoformat(v["created_at"]),
+                                created_at=parse_datetime(v["created_at"]),
                                 description=v["description"],
                                 changes=v.get("changes", []),
                             )
@@ -115,7 +117,7 @@ class RuleMemory:
             versions=[
                 RuleVersion(
                     version=version,
-                    created_at=datetime.utcnow(),
+                    created_at=utc_now(),
                     description=description or f"Initial version of {rule_id}",
                 )
             ],
@@ -152,7 +154,7 @@ class RuleMemory:
         # Create version record
         version = RuleVersion(
             version=new_version,
-            created_at=datetime.utcnow(),
+            created_at=utc_now(),
             description=description,
             changes=changes,
         )

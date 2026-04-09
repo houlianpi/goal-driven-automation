@@ -1,6 +1,6 @@
 # Runs (execution records)
-runs/*
-!runs/.gitkeep
+data/runs/*
+!data/runs/.gitkeep
 
 # Python
 __pycache__/
