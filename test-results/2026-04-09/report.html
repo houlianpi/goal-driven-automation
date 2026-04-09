@@ -2,131 +2,370 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>E2E Test Report - 2026-04-09</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; margin: 0; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 0.5rem; }
-        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 2rem; }
+        :root {
+            --bg-dark: #0a0f1a;
+            --bg-card: #111827;
+            --bg-card-hover: #1f2937;
+            --border: #374151;
+            --text: #f3f4f6;
+            --text-muted: #9ca3af;
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.15);
+            --fail: #ef4444;
+            --accent: #3b82f6;
+            --gradient-start: #1e3a5f;
+            --gradient-end: #0f172a;
+        }
         
-        /* Summary */
-        .summary { display: flex; justify-content: center; gap: 1.5rem; margin: 2rem 0; flex-wrap: wrap; }
-        .card { background: #1e293b; padding: 1.5rem 2rem; border-radius: 0.75rem; text-align: center; min-width: 120px; }
-        .card .num { font-size: 2rem; font-weight: bold; }
-        .card.pass .num { color: #22c55e; }
-        .card.fail .num { color: #ef4444; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* Scenario */
-        .scenario { background: #1e293b; margin: 1.5rem 0; border-radius: 0.75rem; overflow: hidden; }
-        .scenario-header { 
-            padding: 1rem 1.5rem; 
-            display: flex; 
-            justify-content: space-between; 
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
+            min-height: 100vh;
+            color: var(--text);
+            line-height: 1.6;
+        }
+        
+        .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+        
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: linear-gradient(180deg, rgba(59,130,246,0.1) 0%, transparent 100%);
+            border-radius: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(59,130,246,0.2);
+        }
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .header .subtitle { color: var(--text-muted); font-size: 1rem; }
+        
+        /* Progress Bar */
+        .progress-container {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: var(--bg-card);
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+        }
+        .progress-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+            font-size: 0.9rem;
+        }
+        .progress-bar {
+            height: 12px;
+            background: #1f2937;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--success) 0%, #34d399 100%);
+            border-radius: 6px;
+            transition: width 1s ease-out;
+            animation: progressGlow 2s ease-in-out infinite;
+        }
+        @keyframes progressGlow {
+            0%, 100% { box-shadow: 0 0 5px rgba(16, 185, 129, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(16, 185, 129, 0.8); }
+        }
+        
+        /* Summary Cards */
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        .card {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 1rem;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            border-color: var(--accent);
+        }
+        .card .num {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+        .card .label { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .card.pass .num { color: var(--success); }
+        .card.fail .num { color: var(--fail); }
+        .card.rate .num { 
+            background: linear-gradient(90deg, #10b981, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        /* Section Title */
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 2.5rem 0 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .section-title::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, var(--border), transparent);
+        }
+        
+        /* Scenario Cards */
+        .scenario {
+            background: var(--bg-card);
+            margin: 1rem 0;
+            border-radius: 1rem;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        .scenario:hover { border-color: rgba(59,130,246,0.5); }
+        .scenario.expanded { border-color: var(--success); }
+        
+        .scenario-header {
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
             align-items: center;
             cursor: pointer;
-            background: #334155;
+            background: linear-gradient(90deg, rgba(255,255,255,0.02), transparent);
+            transition: background 0.2s;
         }
-        .scenario-header:hover { background: #3f4f63; }
-        .scenario-title { font-weight: 600; font-size: 1.1rem; }
-        .status { padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600; }
-        .status.pass { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .scenario-header:hover { background: rgba(255,255,255,0.05); }
         
-        /* Steps */
-        .scenario-body { display: none; padding: 1.5rem; }
+        .scenario-title {
+            font-weight: 600;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .scenario-meta { display: flex; align-items: center; gap: 1rem; }
+        
+        .status {
+            padding: 0.35rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .status.pass { background: var(--success-bg); color: var(--success); }
+        .status.fail { background: rgba(239,68,68,0.15); color: var(--fail); }
+        
+        .duration { color: var(--text-muted); font-size: 0.9rem; font-family: 'Monaco', monospace; }
+        
+        .expand-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.05);
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+        .scenario.expanded .expand-icon { transform: rotate(180deg); background: var(--success-bg); }
+        
+        /* Scenario Body */
+        .scenario-body {
+            display: none;
+            padding: 0 1.5rem 1.5rem;
+            animation: slideDown 0.3s ease;
+        }
         .scenario.expanded .scenario-body { display: block; }
         
-        .step { 
-            background: #0f172a; 
-            border-radius: 0.5rem; 
-            margin: 1rem 0; 
-            overflow: hidden;
-            border: 1px solid #334155;
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
+        
+        /* Steps */
+        .step {
+            background: var(--bg-dark);
+            border-radius: 0.75rem;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: border-color 0.2s;
+        }
+        .step:hover { border-color: var(--accent); }
+        
         .step-header {
             display: flex;
             align-items: center;
-            padding: 1rem;
+            padding: 1rem 1.25rem;
             gap: 1rem;
         }
+        
         .step-num {
-            width: 2rem;
-            height: 2rem;
-            background: #22c55e;
+            width: 2.5rem;
+            height: 2.5rem;
+            background: linear-gradient(135deg, var(--success), #059669);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 0.9rem;
             flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
         }
+        
         .step-info { flex: 1; }
-        .step-action { font-weight: 600; color: #f8fafc; }
-        .step-detail { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
-        .step-meta { font-size: 0.75rem; color: #64748b; }
+        .step-action { font-weight: 600; color: var(--text); font-size: 1rem; }
+        .step-detail { font-size: 0.875rem; color: var(--text-muted); margin-top: 0.25rem; font-family: 'Monaco', monospace; }
+        .step-meta { font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem; }
         
         .step-screenshot {
-            border-top: 1px solid #334155;
+            border-top: 1px solid var(--border);
             padding: 1rem;
-            background: #1e293b;
+            background: rgba(0,0,0,0.2);
         }
         .step-screenshot img {
-            max-width: 100%;
+            width: 100%;
             border-radius: 0.5rem;
-            border: 1px solid #475569;
+            border: 1px solid var(--border);
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s ease;
         }
-        .step-screenshot img:hover { transform: scale(1.02); }
+        .step-screenshot img:hover {
+            transform: scale(1.01);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+        }
         
-        /* Final screenshot */
+        /* Final Result */
         .final-screenshot {
             margin-top: 1.5rem;
-            padding: 1rem;
-            background: #0f172a;
-            border-radius: 0.5rem;
-            border: 2px solid #22c55e;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05));
+            border-radius: 0.75rem;
+            border: 2px solid var(--success);
         }
-        .final-screenshot h4 { margin: 0 0 1rem 0; color: #22c55e; }
-        .final-screenshot img { max-width: 100%; border-radius: 0.5rem; }
+        .final-screenshot h4 {
+            margin: 0 0 1rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .final-screenshot p { color: var(--text-muted); margin-bottom: 1rem; font-size: 0.9rem; }
+        .final-screenshot img { width: 100%; border-radius: 0.5rem; cursor: pointer; }
         
         /* Modal */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; }
-        .modal img { max-width: 95%; max-height: 95%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        .modal.show { display: block; }
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.2s ease;
+        }
+        .modal.show { display: flex; align-items: center; justify-content: center; }
+        .modal img {
+            max-width: 95%;
+            max-height: 95%;
+            border-radius: 0.5rem;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            width: 40px;
+            height: 40px;
+            background: rgba(255,255,255,0.1);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
         
-        /* Expand icon */
-        .expand-icon { font-size: 1.2rem; transition: transform 0.2s; }
-        .scenario.expanded .expand-icon { transform: rotate(180deg); }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
         
-        a { color: #60a5fa; text-decoration: none; }
-        a:hover { text-decoration: underline; }
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        .footer a { color: var(--accent); text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        
+        /* Responsive */
+        @media (max-width: 640px) {
+            .container { padding: 1rem; }
+            .header h1 { font-size: 1.75rem; }
+            .summary { grid-template-columns: repeat(2, 1fr); }
+            .card .num { font-size: 1.75rem; }
+        }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🧪 E2E Test Report</h1>
-    <p class="subtitle">2026-04-09 | macOS + fsq-mac 0.2.1</p>
-    
-    <div class="summary">
-        <div class="card"><div class="num">5</div><div>Total</div></div>
-        <div class="card pass"><div class="num">5</div><div>Passed</div></div>
-        <div class="card fail"><div class="num">0</div><div>Failed</div></div>
-        <div class="card"><div class="num">100%</div><div>Pass Rate</div></div>
-        <div class="card"><div class="num">101s</div><div>Duration</div></div>
+    <div class="header">
+        <h1>🧪 E2E Test Report</h1>
+        <p class="subtitle">2026-04-09 • macOS • fsq-mac 0.2.1</p>
     </div>
     
-    <h2>📋 Test Scenarios</h2>
-    <p style="color:#94a3b8;margin-bottom:1rem;">Click to expand and see step-by-step execution with screenshots</p>
+    <div class="progress-container">
+        <div class="progress-label">
+            <span>Test Progress</span>
+            <span style="color: var(--success);">5/5 Completed</span>
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width: 100%;"></div>
+        </div>
+    </div>
     
+    <div class="summary">
+        <div class="card"><div class="num">5</div><div class="label">Total</div></div>
+        <div class="card pass"><div class="num">5</div><div class="label">Passed</div></div>
+        <div class="card fail"><div class="num">0</div><div class="label">Failed</div></div>
+        <div class="card rate"><div class="num">100%</div><div class="label">Pass Rate</div></div>
+        <div class="card"><div class="num">101s</div><div class="label">Duration</div></div>
+    </div>
+    
+    <h2 class="section-title">📋 Test Scenarios</h2>
+
     <!-- Scenario 1: Edge Navigate -->
     <div class="scenario expanded">
         <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <span class="scenario-title">✅ Scenario 1: Edge Navigate to GitHub</span>
-            <span>
+            <span class="scenario-title">✅ Edge Navigate to GitHub</span>
+            <div class="scenario-meta">
+                <span class="duration">31s</span>
                 <span class="status pass">PASS</span>
-                <span style="margin-left:1rem;color:#94a3b8;">31s</span>
                 <span class="expand-icon">▼</span>
-            </span>
+            </div>
         </div>
         <div class="scenario-body">
             <div class="step">
@@ -134,307 +373,172 @@
                     <div class="step-num">1</div>
                     <div class="step-info">
                         <div class="step-action">🚀 Launch Application</div>
-                        <div class="step-detail">app.launch → com.microsoft.edgemac</div>
-                        <div class="step-meta">Duration: 3233ms | Window: 新建标签页 - Microsoft Edge</div>
+                        <div class="step-detail">com.microsoft.edgemac</div>
+                        <div class="step-meta">3233ms • Window: 新建标签页</div>
                     </div>
                 </div>
                 <div class="step-screenshot">
-                    <img src="scenario-1-edge-navigate/screenshots/steps/01-launch-edge_thumb.png" onclick="showModal(this.src)" alt="Step 1">
-                </div>
-            </div>
-            
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">2</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+T (New Tab)</div>
-                        <div class="step-meta">Duration: 545ms</div>
-                    </div>
-                </div>
-                <div class="step-screenshot">
-                    <img src="scenario-1-edge-navigate/screenshots/steps/02-new-tab_thumb.png" onclick="showModal(this.src)" alt="Step 2">
-                </div>
-            </div>
-            
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">3</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+L (Focus Address Bar)</div>
-                        <div class="step-meta">Duration: 172ms</div>
-                    </div>
-                </div>
-                <div class="step-screenshot">
-                    <img src="scenario-1-edge-navigate/screenshots/steps/03-address-bar_thumb.png" onclick="showModal(this.src)" alt="Step 3">
-                </div>
-            </div>
-            
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">4</div>
-                    <div class="step-info">
-                        <div class="step-action">📝 Type Text</div>
-                        <div class="step-detail">input.text → "github.com"</div>
-                        <div class="step-meta">Duration: 782ms</div>
-                    </div>
-                </div>
-                <div class="step-screenshot">
-                    <img src="scenario-1-edge-navigate/screenshots/steps/04-type-url_thumb.png" onclick="showModal(this.src)" alt="Step 4">
-                </div>
-            </div>
-            
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">5</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Return (Navigate)</div>
-                        <div class="step-meta">Duration: 234ms</div>
-                    </div>
-                </div>
-                <div class="step-screenshot">
-                    <img src="scenario-1-edge-navigate/screenshots/steps/05-navigate_thumb.png" onclick="showModal(this.src)" alt="Step 5">
-                </div>
-            </div>
-            
-            <div class="final-screenshot">
-                <h4>✅ Final Result</h4>
-                <p style="color:#94a3b8;margin-bottom:1rem;">Window Title: GitHub · Change is constant. GitHub keeps you ahead. · GitHub - Microsoft Edge</p>
-                <img src="scenario-1-edge-navigate/screenshots/steps/06-final_thumb.png" onclick="showModal(this.src)" alt="Final">
-            </div>
-        </div>
-    </div>
-
-    <!-- Scenario 2: Finder -->
-    <div class="scenario">
-        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <span class="scenario-title">✅ Scenario 2: Finder Create Folder</span>
-            <span>
-                <span class="status pass">PASS</span>
-                <span style="margin-left:1rem;color:#94a3b8;">14s</span>
-                <span class="expand-icon">▼</span>
-            </span>
-        </div>
-        <div class="scenario-body">
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">1</div>
-                    <div class="step-info">
-                        <div class="step-action">🚀 Launch Application</div>
-                        <div class="step-detail">app.launch → com.apple.finder</div>
-                    </div>
+                    <img src="scenario-1-edge-navigate/screenshots/steps/01-launch-edge_thumb.png" onclick="showModal(this.src)">
                 </div>
             </div>
             <div class="step">
                 <div class="step-header">
                     <div class="step-num">2</div>
                     <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+Shift+D (Go to Desktop)</div>
+                        <div class="step-action">⌨️ New Tab</div>
+                        <div class="step-detail">Cmd+T</div>
+                        <div class="step-meta">545ms</div>
                     </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/02-new-tab_thumb.png" onclick="showModal(this.src)">
                 </div>
             </div>
             <div class="step">
                 <div class="step-header">
                     <div class="step-num">3</div>
                     <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+Shift+N (New Folder)</div>
+                        <div class="step-action">⌨️ Focus Address Bar</div>
+                        <div class="step-detail">Cmd+L</div>
+                        <div class="step-meta">172ms</div>
                     </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/03-address-bar_thumb.png" onclick="showModal(this.src)">
                 </div>
             </div>
             <div class="step">
                 <div class="step-header">
                     <div class="step-num">4</div>
                     <div class="step-info">
-                        <div class="step-action">📝 Type Text</div>
-                        <div class="step-detail">input.text → "TestFolder_E2E"</div>
+                        <div class="step-action">📝 Type URL</div>
+                        <div class="step-detail">"github.com"</div>
+                        <div class="step-meta">782ms</div>
                     </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/04-type-url_thumb.png" onclick="showModal(this.src)">
                 </div>
             </div>
             <div class="step">
                 <div class="step-header">
                     <div class="step-num">5</div>
                     <div class="step-info">
-                        <div class="step-action">⌨️ Key Press</div>
-                        <div class="step-detail">input.key → Return (Confirm)</div>
+                        <div class="step-action">⌨️ Navigate</div>
+                        <div class="step-detail">Return</div>
+                        <div class="step-meta">234ms</div>
                     </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/05-navigate_thumb.png" onclick="showModal(this.src)">
                 </div>
             </div>
             <div class="final-screenshot">
-                <h4>✅ Final Result</h4>
-                <p style="color:#94a3b8;margin-bottom:1rem;">Verification: ls ~/Desktop | grep TestFolder_E2E → Found!</p>
-                <img src="scenario-2-finder-folder/screenshots/final_thumb.png" onclick="showModal(this.src)" alt="Final">
+                <h4>✅ Verification Passed</h4>
+                <p>Window: GitHub · Change is constant. GitHub keeps you ahead. · GitHub - Microsoft Edge</p>
+                <img src="scenario-1-edge-navigate/screenshots/steps/06-final_thumb.png" onclick="showModal(this.src)">
             </div>
         </div>
     </div>
 
-    <!-- Scenario 3: Safari -->
+    <!-- Scenario 2-5: Collapsed -->
     <div class="scenario">
         <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <span class="scenario-title">✅ Scenario 3: Safari Multi-Tab Management</span>
-            <span>
+            <span class="scenario-title">✅ Finder Create Folder</span>
+            <div class="scenario-meta">
+                <span class="duration">14s</span>
                 <span class="status pass">PASS</span>
-                <span style="margin-left:1rem;color:#94a3b8;">27s</span>
                 <span class="expand-icon">▼</span>
-            </span>
+            </div>
         </div>
         <div class="scenario-body">
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">1</div>
-                    <div class="step-info">
-                        <div class="step-action">🚀 Launch Application</div>
-                        <div class="step-detail">app.launch → com.apple.Safari</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">2-4</div>
-                    <div class="step-info">
-                        <div class="step-action">🌐 Navigate Tab 1</div>
-                        <div class="step-detail">Cmd+L → type "apple.com" → Return</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">5-7</div>
-                    <div class="step-info">
-                        <div class="step-action">🌐 Navigate Tab 2</div>
-                        <div class="step-detail">Cmd+T → type "google.com" → Return</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">8-10</div>
-                    <div class="step-info">
-                        <div class="step-action">🌐 Navigate Tab 3</div>
-                        <div class="step-detail">Cmd+T → type "github.com" → Return</div>
-                    </div>
-                </div>
-            </div>
+            <div class="step"><div class="step-header"><div class="step-num">1</div><div class="step-info"><div class="step-action">🚀 Launch Finder</div><div class="step-detail">com.apple.finder</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">2</div><div class="step-info"><div class="step-action">⌨️ Go to Desktop</div><div class="step-detail">Cmd+Shift+D</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">3</div><div class="step-info"><div class="step-action">⌨️ New Folder</div><div class="step-detail">Cmd+Shift+N</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">4</div><div class="step-info"><div class="step-action">📝 Name Folder</div><div class="step-detail">"TestFolder_E2E"</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">5</div><div class="step-info"><div class="step-action">⌨️ Confirm</div><div class="step-detail">Return</div></div></div></div>
             <div class="final-screenshot">
-                <h4>✅ Final Result</h4>
-                <p style="color:#94a3b8;margin-bottom:1rem;">Window Title: GitHub · Change is constant. GitHub keeps you ahead. · GitHub</p>
-                <img src="scenario-3-safari-multitab/screenshots/final_thumb.png" onclick="showModal(this.src)" alt="Final">
+                <h4>✅ Verification Passed</h4>
+                <p>ls ~/Desktop | grep TestFolder_E2E → Found!</p>
+                <img src="scenario-2-finder-folder/screenshots/final_thumb.png" onclick="showModal(this.src)">
             </div>
         </div>
     </div>
 
-    <!-- Scenario 4: Notes -->
     <div class="scenario">
         <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <span class="scenario-title">✅ Scenario 4: Notes Quick Note</span>
-            <span>
+            <span class="scenario-title">✅ Safari Multi-Tab</span>
+            <div class="scenario-meta">
+                <span class="duration">27s</span>
                 <span class="status pass">PASS</span>
-                <span style="margin-left:1rem;color:#94a3b8;">14s</span>
                 <span class="expand-icon">▼</span>
-            </span>
+            </div>
         </div>
         <div class="scenario-body">
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">1</div>
-                    <div class="step-info">
-                        <div class="step-action">🚀 Launch Application</div>
-                        <div class="step-detail">app.launch → com.apple.Notes</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">2</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+N (New Note)</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">3</div>
-                    <div class="step-info">
-                        <div class="step-action">📝 Type Text</div>
-                        <div class="step-detail">input.text → "E2E Test Note - Thu Apr 9 16:17:52 CST 2026"</div>
-                    </div>
-                </div>
-            </div>
+            <div class="step"><div class="step-header"><div class="step-num">1</div><div class="step-info"><div class="step-action">🚀 Launch Safari</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">2-4</div><div class="step-info"><div class="step-action">🌐 Tab 1: apple.com</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">5-7</div><div class="step-info"><div class="step-action">🌐 Tab 2: google.com</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">8-10</div><div class="step-info"><div class="step-action">🌐 Tab 3: github.com</div></div></div></div>
             <div class="final-screenshot">
-                <h4>✅ Final Result</h4>
-                <p style="color:#94a3b8;margin-bottom:1rem;">Note created with test content</p>
-                <img src="scenario-4-notes-quicknote/screenshots/final_thumb.png" onclick="showModal(this.src)" alt="Final">
+                <h4>✅ Verification Passed</h4>
+                <p>Window: GitHub · Change is constant...</p>
+                <img src="scenario-3-safari-multitab/screenshots/final_thumb.png" onclick="showModal(this.src)">
             </div>
         </div>
     </div>
 
-    <!-- Scenario 5: System Settings -->
     <div class="scenario">
         <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
-            <span class="scenario-title">✅ Scenario 5: System Settings Wi-Fi</span>
-            <span>
+            <span class="scenario-title">✅ Notes Quick Note</span>
+            <div class="scenario-meta">
+                <span class="duration">14s</span>
                 <span class="status pass">PASS</span>
-                <span style="margin-left:1rem;color:#94a3b8;">15s</span>
                 <span class="expand-icon">▼</span>
-            </span>
+            </div>
         </div>
         <div class="scenario-body">
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">1</div>
-                    <div class="step-info">
-                        <div class="step-action">🚀 Launch Application</div>
-                        <div class="step-detail">app.launch → com.apple.systempreferences</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">2</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Cmd+F (Search)</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">3</div>
-                    <div class="step-info">
-                        <div class="step-action">📝 Type Text</div>
-                        <div class="step-detail">input.text → "Wi-Fi"</div>
-                    </div>
-                </div>
-            </div>
-            <div class="step">
-                <div class="step-header">
-                    <div class="step-num">4</div>
-                    <div class="step-info">
-                        <div class="step-action">⌨️ Keyboard Shortcut</div>
-                        <div class="step-detail">input.hotkey → Return (Select)</div>
-                    </div>
-                </div>
-            </div>
+            <div class="step"><div class="step-header"><div class="step-num">1</div><div class="step-info"><div class="step-action">🚀 Launch Notes</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">2</div><div class="step-info"><div class="step-action">⌨️ New Note</div><div class="step-detail">Cmd+N</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">3</div><div class="step-info"><div class="step-action">📝 Type Content</div><div class="step-detail">"E2E Test Note..."</div></div></div></div>
             <div class="final-screenshot">
-                <h4>✅ Final Result</h4>
-                <p style="color:#94a3b8;margin-bottom:1rem;">System Settings panel opened</p>
-                <img src="scenario-5-system-settings/screenshots/final_thumb.png" onclick="showModal(this.src)" alt="Final">
+                <h4>✅ Verification Passed</h4>
+                <p>Note created with test content</p>
+                <img src="scenario-4-notes-quicknote/screenshots/final_thumb.png" onclick="showModal(this.src)">
             </div>
         </div>
     </div>
 
-    <p style="text-align:center;color:#64748b;margin-top:3rem;">
-        Generated by Goal-Driven Automation Framework | 2026-04-09 16:35
-    </p>
+    <div class="scenario">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ System Settings Wi-Fi</span>
+            <div class="scenario-meta">
+                <span class="duration">15s</span>
+                <span class="status pass">PASS</span>
+                <span class="expand-icon">▼</span>
+            </div>
+        </div>
+        <div class="scenario-body">
+            <div class="step"><div class="step-header"><div class="step-num">1</div><div class="step-info"><div class="step-action">🚀 Launch Settings</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">2</div><div class="step-info"><div class="step-action">⌨️ Search</div><div class="step-detail">Cmd+F</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">3</div><div class="step-info"><div class="step-action">📝 Type</div><div class="step-detail">"Wi-Fi"</div></div></div></div>
+            <div class="step"><div class="step-header"><div class="step-num">4</div><div class="step-info"><div class="step-action">⌨️ Select</div><div class="step-detail">Return</div></div></div></div>
+            <div class="final-screenshot">
+                <h4>✅ Verification Passed</h4>
+                <p>System Settings panel opened</p>
+                <img src="scenario-5-system-settings/screenshots/final_thumb.png" onclick="showModal(this.src)">
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Generated by <a href="https://github.com/houlianpi/goal-driven-automation">Goal-Driven Automation</a><br>
+        2026-04-09 16:58
+    </div>
 </div>
 
-<!-- Image Modal -->
 <div class="modal" id="modal" onclick="this.classList.remove('show')">
-    <img id="modal-img" src="" alt="Full size">
+    <button class="modal-close" onclick="document.getElementById('modal').classList.remove('show')">×</button>
+    <img id="modal-img" src="">
 </div>
 
 <script>
@@ -442,6 +546,9 @@ function showModal(src) {
     document.getElementById('modal-img').src = src;
     document.getElementById('modal').classList.add('show');
 }
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.getElementById('modal').classList.remove('show');
+});
 </script>
 </body>
 </html>
