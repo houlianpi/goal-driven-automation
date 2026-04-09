@@ -21,3 +21,7 @@ Thumbs.db
 
 # Test artifacts
 *.log
+
+# Local log directories
+log/
+data/log/
