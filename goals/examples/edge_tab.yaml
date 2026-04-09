@@ -1,0 +1,28 @@
+# Goal: Test Edge Tab Creation
+# This is an example goal file
+
+id: edge-tab-creation
+name: Test Edge New Tab Creation
+description: Verify that Microsoft Edge can create new tabs correctly
+
+target:
+  application: Microsoft Edge
+  version: latest
+
+objectives:
+  - action: create_new_tab
+    expected: new empty tab appears
+
+constraints:
+  - type: no_user_data_modification
+    description: Do not modify user bookmarks or history
+
+acceptance:
+  - condition: new tab is created
+    priority: required
+  - condition: URL bar is focused
+    priority: preferred
+
+review_required:
+  - step: final_verification
+    reason: Confirm tab count increased
