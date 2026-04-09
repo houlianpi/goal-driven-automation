@@ -107,8 +107,8 @@ class PlanGenerator:
         if goal.expected_state and "assert" not in goal.actions:
             steps.append(PlanStep(
                 step_id=f"s{step_num}",
-                action="assert",
-                params={"condition": goal.expected_state},
+                action="assert_visible",
+                params={"locator": goal.expected_state, "strategy": "accessibility_id"},
                 evidence=self.DEFAULT_EVIDENCE.get("assert", {}),
                 retry_policy=self.DEFAULT_RETRY.get("assert", {}),
                 on_fail="continue",
@@ -196,8 +196,8 @@ class PlanGenerator:
         elif action == "assert":
             return PlanStep(
                 step_id=step_id,
-                action="assert_element",
-                params={"condition": goal.expected_state or ""},
+                action="assert_visible",
+                params={"locator": goal.expected_state or "window", "strategy": "accessibility_id"},
                 evidence=self.DEFAULT_EVIDENCE.get("assert", {}),
                 retry_policy=self.DEFAULT_RETRY.get("assert", {}),
                 on_fail="continue",
