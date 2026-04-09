@@ -4,95 +4,444 @@
     <meta charset="UTF-8">
     <title>E2E Test Report - 2026-04-09</title>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; }
-        .container { max-width: 1000px; margin: 0 auto; }
-        h1 { text-align: center; }
-        .summary { display: flex; justify-content: center; gap: 2rem; margin: 2rem 0; }
-        .card { background: #1e293b; padding: 1.5rem 2rem; border-radius: 0.75rem; text-align: center; }
+        body { font-family: -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; padding: 2rem; margin: 0; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 0.5rem; }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 2rem; }
+        
+        /* Summary */
+        .summary { display: flex; justify-content: center; gap: 1.5rem; margin: 2rem 0; flex-wrap: wrap; }
+        .card { background: #1e293b; padding: 1.5rem 2rem; border-radius: 0.75rem; text-align: center; min-width: 120px; }
         .card .num { font-size: 2rem; font-weight: bold; }
         .card.pass .num { color: #22c55e; }
         .card.fail .num { color: #ef4444; }
-        .scenario { background: #1e293b; margin: 1rem 0; border-radius: 0.5rem; overflow: hidden; }
-        .scenario-header { padding: 1rem; display: flex; justify-content: space-between; }
-        .status { padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem; }
+        
+        /* Scenario */
+        .scenario { background: #1e293b; margin: 1.5rem 0; border-radius: 0.75rem; overflow: hidden; }
+        .scenario-header { 
+            padding: 1rem 1.5rem; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            cursor: pointer;
+            background: #334155;
+        }
+        .scenario-header:hover { background: #3f4f63; }
+        .scenario-title { font-weight: 600; font-size: 1.1rem; }
+        .status { padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.8rem; font-weight: 600; }
         .status.pass { background: rgba(34,197,94,0.2); color: #22c55e; }
-        .steps { padding: 0 1rem 1rem; }
-        .step { background: rgba(0,0,0,0.2); padding: 0.5rem; margin: 0.25rem 0; border-radius: 0.25rem; }
-        a { color: #60a5fa; }
+        
+        /* Steps */
+        .scenario-body { display: none; padding: 1.5rem; }
+        .scenario.expanded .scenario-body { display: block; }
+        
+        .step { 
+            background: #0f172a; 
+            border-radius: 0.5rem; 
+            margin: 1rem 0; 
+            overflow: hidden;
+            border: 1px solid #334155;
+        }
+        .step-header {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        .step-num {
+            width: 2rem;
+            height: 2rem;
+            background: #22c55e;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .step-info { flex: 1; }
+        .step-action { font-weight: 600; color: #f8fafc; }
+        .step-detail { font-size: 0.85rem; color: #94a3b8; margin-top: 0.25rem; }
+        .step-meta { font-size: 0.75rem; color: #64748b; }
+        
+        .step-screenshot {
+            border-top: 1px solid #334155;
+            padding: 1rem;
+            background: #1e293b;
+        }
+        .step-screenshot img {
+            max-width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid #475569;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .step-screenshot img:hover { transform: scale(1.02); }
+        
+        /* Final screenshot */
+        .final-screenshot {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #0f172a;
+            border-radius: 0.5rem;
+            border: 2px solid #22c55e;
+        }
+        .final-screenshot h4 { margin: 0 0 1rem 0; color: #22c55e; }
+        .final-screenshot img { max-width: 100%; border-radius: 0.5rem; }
+        
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; }
+        .modal img { max-width: 95%; max-height: 95%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .modal.show { display: block; }
+        
+        /* Expand icon */
+        .expand-icon { font-size: 1.2rem; transition: transform 0.2s; }
+        .scenario.expanded .expand-icon { transform: rotate(180deg); }
+        
+        a { color: #60a5fa; text-decoration: none; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>🧪 E2E Test Report</h1>
-    <p style="text-align:center;color:#94a3b8;">2026-04-09 | macOS + fsq-mac 0.2.1</p>
+    <p class="subtitle">2026-04-09 | macOS + fsq-mac 0.2.1</p>
     
     <div class="summary">
         <div class="card"><div class="num">5</div><div>Total</div></div>
         <div class="card pass"><div class="num">5</div><div>Passed</div></div>
         <div class="card fail"><div class="num">0</div><div>Failed</div></div>
         <div class="card"><div class="num">100%</div><div>Pass Rate</div></div>
+        <div class="card"><div class="num">101s</div><div>Duration</div></div>
     </div>
     
     <h2>📋 Test Scenarios</h2>
-    <div class="scenario">
-        <div class="scenario-header">
-            <span>✅ Edge Navigate to GitHub</span>
-            <span><span class="status pass">PASS</span> 31s</span>
-        </div>
-        <div class="steps">
-            <a href="scenario-1-edge-navigate/screenshots/final.png" target="_blank">📸 View Screenshot</a> |
-            <a href="scenario-1-edge-navigate/evidence.json" target="_blank">📄 Evidence JSON</a> |
-            <a href="scenario-1-edge-navigate/logs/execution.log" target="_blank">📝 Execution Log</a>
-        </div>
-    </div>
-    <div class="scenario">
-        <div class="scenario-header">
-            <span>✅ Finder Create Folder</span>
-            <span><span class="status pass">PASS</span> 14s</span>
-        </div>
-        <div class="steps">
-            <a href="scenario-2-finder-folder/screenshots/final.png" target="_blank">📸 View Screenshot</a> |
-            <a href="scenario-2-finder-folder/evidence.json" target="_blank">📄 Evidence JSON</a> |
-            <a href="scenario-2-finder-folder/logs/execution.log" target="_blank">📝 Execution Log</a>
-        </div>
-    </div>
-    <div class="scenario">
-        <div class="scenario-header">
-            <span>✅ Safari Multi-Tab Management</span>
-            <span><span class="status pass">PASS</span> 27s</span>
-        </div>
-        <div class="steps">
-            <a href="scenario-3-safari-multitab/screenshots/final.png" target="_blank">📸 View Screenshot</a> |
-            <a href="scenario-3-safari-multitab/evidence.json" target="_blank">📄 Evidence JSON</a> |
-            <a href="scenario-3-safari-multitab/logs/execution.log" target="_blank">📝 Execution Log</a>
-        </div>
-    </div>
-    <div class="scenario">
-        <div class="scenario-header">
-            <span>✅ Notes Quick Note</span>
-            <span><span class="status pass">PASS</span> 14s</span>
-        </div>
-        <div class="steps">
-            <a href="scenario-4-notes-quicknote/screenshots/final.png" target="_blank">📸 View Screenshot</a> |
-            <a href="scenario-4-notes-quicknote/evidence.json" target="_blank">📄 Evidence JSON</a> |
-            <a href="scenario-4-notes-quicknote/logs/execution.log" target="_blank">📝 Execution Log</a>
-        </div>
-    </div>
-    <div class="scenario">
-        <div class="scenario-header">
-            <span>✅ System Settings Wi-Fi Check</span>
-            <span><span class="status pass">PASS</span> 15s</span>
-        </div>
-        <div class="steps">
-            <a href="scenario-5-system-settings/screenshots/final.png" target="_blank">📸 View Screenshot</a> |
-            <a href="scenario-5-system-settings/evidence.json" target="_blank">📄 Evidence JSON</a> |
-            <a href="scenario-5-system-settings/logs/execution.log" target="_blank">📝 Execution Log</a>
-        </div>
-    </div>
+    <p style="color:#94a3b8;margin-bottom:1rem;">Click to expand and see step-by-step execution with screenshots</p>
     
-    <p style="text-align:center;color:#94a3b8;margin-top:2rem;">
-        Generated by Goal-Driven Automation Framework
+    <!-- Scenario 1: Edge Navigate -->
+    <div class="scenario expanded">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ Scenario 1: Edge Navigate to GitHub</span>
+            <span>
+                <span class="status pass">PASS</span>
+                <span style="margin-left:1rem;color:#94a3b8;">31s</span>
+                <span class="expand-icon">▼</span>
+            </span>
+        </div>
+        <div class="scenario-body">
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">1</div>
+                    <div class="step-info">
+                        <div class="step-action">🚀 Launch Application</div>
+                        <div class="step-detail">app.launch → com.microsoft.edgemac</div>
+                        <div class="step-meta">Duration: 3233ms | Window: 新建标签页 - Microsoft Edge</div>
+                    </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/01-launch-edge.png" onclick="showModal(this.src)" alt="Step 1">
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">2</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+T (New Tab)</div>
+                        <div class="step-meta">Duration: 545ms</div>
+                    </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/02-new-tab.png" onclick="showModal(this.src)" alt="Step 2">
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">3</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+L (Focus Address Bar)</div>
+                        <div class="step-meta">Duration: 172ms</div>
+                    </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/03-address-bar.png" onclick="showModal(this.src)" alt="Step 3">
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">4</div>
+                    <div class="step-info">
+                        <div class="step-action">📝 Type Text</div>
+                        <div class="step-detail">input.text → "github.com"</div>
+                        <div class="step-meta">Duration: 782ms</div>
+                    </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/04-type-url.png" onclick="showModal(this.src)" alt="Step 4">
+                </div>
+            </div>
+            
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">5</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Return (Navigate)</div>
+                        <div class="step-meta">Duration: 234ms</div>
+                    </div>
+                </div>
+                <div class="step-screenshot">
+                    <img src="scenario-1-edge-navigate/screenshots/steps/05-navigate.png" onclick="showModal(this.src)" alt="Step 5">
+                </div>
+            </div>
+            
+            <div class="final-screenshot">
+                <h4>✅ Final Result</h4>
+                <p style="color:#94a3b8;margin-bottom:1rem;">Window Title: GitHub · Change is constant. GitHub keeps you ahead. · GitHub - Microsoft Edge</p>
+                <img src="scenario-1-edge-navigate/screenshots/steps/06-final.png" onclick="showModal(this.src)" alt="Final">
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario 2: Finder -->
+    <div class="scenario">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ Scenario 2: Finder Create Folder</span>
+            <span>
+                <span class="status pass">PASS</span>
+                <span style="margin-left:1rem;color:#94a3b8;">14s</span>
+                <span class="expand-icon">▼</span>
+            </span>
+        </div>
+        <div class="scenario-body">
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">1</div>
+                    <div class="step-info">
+                        <div class="step-action">🚀 Launch Application</div>
+                        <div class="step-detail">app.launch → com.apple.finder</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">2</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+Shift+D (Go to Desktop)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">3</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+Shift+N (New Folder)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">4</div>
+                    <div class="step-info">
+                        <div class="step-action">📝 Type Text</div>
+                        <div class="step-detail">input.text → "TestFolder_E2E"</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">5</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Key Press</div>
+                        <div class="step-detail">input.key → Return (Confirm)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="final-screenshot">
+                <h4>✅ Final Result</h4>
+                <p style="color:#94a3b8;margin-bottom:1rem;">Verification: ls ~/Desktop | grep TestFolder_E2E → Found!</p>
+                <img src="scenario-2-finder-folder/screenshots/final.png" onclick="showModal(this.src)" alt="Final">
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario 3: Safari -->
+    <div class="scenario">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ Scenario 3: Safari Multi-Tab Management</span>
+            <span>
+                <span class="status pass">PASS</span>
+                <span style="margin-left:1rem;color:#94a3b8;">27s</span>
+                <span class="expand-icon">▼</span>
+            </span>
+        </div>
+        <div class="scenario-body">
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">1</div>
+                    <div class="step-info">
+                        <div class="step-action">🚀 Launch Application</div>
+                        <div class="step-detail">app.launch → com.apple.Safari</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">2-4</div>
+                    <div class="step-info">
+                        <div class="step-action">🌐 Navigate Tab 1</div>
+                        <div class="step-detail">Cmd+L → type "apple.com" → Return</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">5-7</div>
+                    <div class="step-info">
+                        <div class="step-action">🌐 Navigate Tab 2</div>
+                        <div class="step-detail">Cmd+T → type "google.com" → Return</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">8-10</div>
+                    <div class="step-info">
+                        <div class="step-action">🌐 Navigate Tab 3</div>
+                        <div class="step-detail">Cmd+T → type "github.com" → Return</div>
+                    </div>
+                </div>
+            </div>
+            <div class="final-screenshot">
+                <h4>✅ Final Result</h4>
+                <p style="color:#94a3b8;margin-bottom:1rem;">Window Title: GitHub · Change is constant. GitHub keeps you ahead. · GitHub</p>
+                <img src="scenario-3-safari-multitab/screenshots/final.png" onclick="showModal(this.src)" alt="Final">
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario 4: Notes -->
+    <div class="scenario">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ Scenario 4: Notes Quick Note</span>
+            <span>
+                <span class="status pass">PASS</span>
+                <span style="margin-left:1rem;color:#94a3b8;">14s</span>
+                <span class="expand-icon">▼</span>
+            </span>
+        </div>
+        <div class="scenario-body">
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">1</div>
+                    <div class="step-info">
+                        <div class="step-action">🚀 Launch Application</div>
+                        <div class="step-detail">app.launch → com.apple.Notes</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">2</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+N (New Note)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">3</div>
+                    <div class="step-info">
+                        <div class="step-action">📝 Type Text</div>
+                        <div class="step-detail">input.text → "E2E Test Note - Thu Apr 9 16:17:52 CST 2026"</div>
+                    </div>
+                </div>
+            </div>
+            <div class="final-screenshot">
+                <h4>✅ Final Result</h4>
+                <p style="color:#94a3b8;margin-bottom:1rem;">Note created with test content</p>
+                <img src="scenario-4-notes-quicknote/screenshots/final.png" onclick="showModal(this.src)" alt="Final">
+            </div>
+        </div>
+    </div>
+
+    <!-- Scenario 5: System Settings -->
+    <div class="scenario">
+        <div class="scenario-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span class="scenario-title">✅ Scenario 5: System Settings Wi-Fi</span>
+            <span>
+                <span class="status pass">PASS</span>
+                <span style="margin-left:1rem;color:#94a3b8;">15s</span>
+                <span class="expand-icon">▼</span>
+            </span>
+        </div>
+        <div class="scenario-body">
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">1</div>
+                    <div class="step-info">
+                        <div class="step-action">🚀 Launch Application</div>
+                        <div class="step-detail">app.launch → com.apple.systempreferences</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">2</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Cmd+F (Search)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">3</div>
+                    <div class="step-info">
+                        <div class="step-action">📝 Type Text</div>
+                        <div class="step-detail">input.text → "Wi-Fi"</div>
+                    </div>
+                </div>
+            </div>
+            <div class="step">
+                <div class="step-header">
+                    <div class="step-num">4</div>
+                    <div class="step-info">
+                        <div class="step-action">⌨️ Keyboard Shortcut</div>
+                        <div class="step-detail">input.hotkey → Return (Select)</div>
+                    </div>
+                </div>
+            </div>
+            <div class="final-screenshot">
+                <h4>✅ Final Result</h4>
+                <p style="color:#94a3b8;margin-bottom:1rem;">System Settings panel opened</p>
+                <img src="scenario-5-system-settings/screenshots/final.png" onclick="showModal(this.src)" alt="Final">
+            </div>
+        </div>
+    </div>
+
+    <p style="text-align:center;color:#64748b;margin-top:3rem;">
+        Generated by Goal-Driven Automation Framework | 2026-04-09 16:35
     </p>
 </div>
+
+<!-- Image Modal -->
+<div class="modal" id="modal" onclick="this.classList.remove('show')">
+    <img id="modal-img" src="" alt="Full size">
+</div>
+
+<script>
+function showModal(src) {
+    document.getElementById('modal-img').src = src;
+    document.getElementById('modal').classList.add('show');
+}
+</script>
 </body>
 </html>
