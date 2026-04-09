@@ -34,6 +34,8 @@ class TestRetryStrategy:
         result = strategy.apply(step, {})
         assert result.success is True
         assert result.step_evidence is not None
+        _, kwargs = mock_run.call_args
+        assert kwargs["shell"] is False
 
 
 class TestSkipStrategy:
@@ -84,8 +86,25 @@ class TestRepairLoop:
         error = StepError("Timeout", "timed out", FailureClassification.ENVIRONMENT_FAILURE)
         run.add_step(StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error, cli_command=cli))
         result = loop.run(run)
-        assert result.outcome in [RepairOutcome.RECOVERED, RepairOutcome.PARTIAL]
+        assert result.outcome == RepairOutcome.RECOVERED
+        assert result.repaired_evidence.status == RunStatus.PARTIAL
+        assert result.final_evaluation.verdict == RepairOutcome.RECOVERED.value if False else result.final_evaluation.verdict
         assert len(result.repair_attempts) > 0
+
+    def test_skip_strategy_results_in_partial_not_failed(self):
+        loop = RepairLoop()
+        loop.strategies = [SkipStrategy()]
+        run = RunEvidence(plan_id="plan-test")
+        error = StepError("Error", "some error", FailureClassification.OBSERVATION_INSUFFICIENT)
+        run.add_step(StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error))
+
+        result = loop.run(run)
+
+        assert result.outcome == RepairOutcome.RECOVERED
+        assert result.repaired_evidence is not None
+        assert result.repaired_evidence.status == RunStatus.PARTIAL
+        assert result.final_evaluation is not None
+        assert result.final_evaluation.failed_steps == 0
     
     def test_skip_strategy_used(self):
         loop = RepairLoop()
@@ -98,3 +117,27 @@ class TestRepairLoop:
         # Skip should mark as recovered (step was skipped successfully)
         assert len(result.repair_attempts) > 0
         assert result.repair_attempts[0].strategy == "skip"
+
+    def test_clone_evidence_does_not_mutate_original_steps(self):
+        loop = RepairLoop()
+        original = RunEvidence(plan_id="plan-test")
+        error = StepError("Timeout", "timed out", FailureClassification.ENVIRONMENT_FAILURE)
+        original_step = StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error)
+        original.steps.append(original_step)
+
+        cloned = loop._clone_evidence(original)
+        cloned.steps[0].status = StepStatus.REPAIRED
+
+        assert original.steps[0].status == StepStatus.FAILURE
+        assert cloned.steps[0].status == StepStatus.REPAIRED
+
+    def test_clone_evidence_does_not_share_repairs(self):
+        loop = RepairLoop()
+        original = RunEvidence(plan_id="plan-test")
+        original.repairs.append(RepairAttempt(step_id="s1", failure_type="timeout", strategy="retry", attempt_number=1, success=False))
+
+        cloned = loop._clone_evidence(original)
+        cloned.repairs.append(RepairAttempt(step_id="s2", failure_type="timeout", strategy="retry", attempt_number=2, success=True))
+
+        assert len(original.repairs) == 1
+        assert len(cloned.repairs) == 2

@@ -2,6 +2,40 @@
 
 AI Agent 驱动的 macOS 自动化测试框架。
 
+## 环境要求
+
+- Python `3.13+`
+
+## 安装
+
+安装运行依赖：
+
+```bash
+pip install -e .
+```
+
+安装开发依赖：
+
+```bash
+pip install -e .[dev]
+```
+
+## 开发验证
+
+运行全量测试：
+
+```bash
+pytest -q
+```
+
+执行一个 dry-run 示例：
+
+```bash
+python -m src.cli run "Open Edge and create new tab" --dry-run
+```
+
+如果 dry-run 命令失败，请将其视为单独的 CLI 问题进行记录；非主线 hygiene 工作默认不在这里修复 CLI 行为。
+
 ## 架构
 
 ```

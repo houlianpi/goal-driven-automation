@@ -1,12 +1,12 @@
 """
-Plan Generator - Generates Plan IR from parsed Goals.
+Plan Generator - Generates semantic Plan IR from parsed Goals.
 """
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from datetime import datetime
 import uuid
 
 from .goal_parser import Goal, GoalType
+from src.time_utils import utc_now
 
 
 @dataclass
@@ -21,22 +21,26 @@ class PlanStep:
     on_fail: str = "abort"
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        data = {
             "step_id": self.step_id,
             "action": self.action,
-            "target": self.target,
             "params": self.params or {},
             "evidence": self.evidence or {},
             "retry_policy": self.retry_policy or {},
             "on_fail": self.on_fail,
         }
+        if self.target is not None:
+            data["target"] = self.target
+        return data
 
 
 class PlanGenerator:
     """
-    Generates Plan IR from parsed Goals.
-    
-    Maps goal types and actions to concrete plan steps.
+    Generates semantic Plan IR from parsed Goals.
+
+    The generator emits stable, schema-level actions such as
+    ``launch`` and ``shortcut``. The compiler is responsible for
+    mapping those actions to capability-layer registry actions.
     """
     
     # Default evidence config per action type
@@ -46,8 +50,7 @@ class PlanGenerator:
         "type": {"screenshot_after": True},
         "assert": {"screenshot_after": True, "capture_ui_tree": True},
         "wait": {},
-        "navigate": {"screenshot_after": True},
-        "new_tab": {"screenshot_after": True},
+        "shortcut": {"screenshot_after": True},
     }
     
     # Default retry policy per action type
@@ -57,8 +60,11 @@ class PlanGenerator:
         "type": {"max_attempts": 2, "delay_ms": 500},
         "assert": {"max_attempts": 1},
         "wait": {"max_attempts": 1},
-        "navigate": {"max_attempts": 2, "delay_ms": 1000},
-        "new_tab": {"max_attempts": 2, "delay_ms": 500},
+        "shortcut": {"max_attempts": 2, "delay_ms": 500},
+    }
+
+    SHORTCUTS = {
+        "new_tab": ["command", "t"],
     }
     
     def generate(self, goal: Goal) -> Dict[str, Any]:
@@ -78,16 +84,14 @@ class PlanGenerator:
         return {
             "plan_id": plan_id,
             "version": "1.0.0",
-            "goal": {
-                "goal_id": goal.goal_id,
-                "description": goal.description,
-            },
+            "goal": goal.description,
             "app": goal.target_app or "System",
             "preconditions": self._generate_preconditions(goal),
             "steps": [s.to_dict() for s in steps],
             "expected_final_state": goal.expected_state or "Goal completed",
+            "created_at": utc_now().isoformat(),
             "metadata": {
-                "generated_at": datetime.utcnow().isoformat(),
+                "goal_id": goal.goal_id,
                 "goal_type": goal.goal_type.value,
             },
         }
@@ -103,12 +107,16 @@ class PlanGenerator:
                 steps.append(step)
                 step_num += 1
         
-        # Add verification step if expected_state exists
+        # Add a semantic verification step when the goal includes a final state.
         if goal.expected_state and "assert" not in goal.actions:
+            params: Dict[str, Any] = {"condition": goal.expected_state}
+            if goal.target_app:
+                params["locator"] = goal.target_app
+                params["strategy"] = "accessibility_id"
             steps.append(PlanStep(
                 step_id=f"s{step_num}",
-                action="assert_visible",
-                params={"locator": goal.expected_state, "strategy": "accessibility_id"},
+                action="assert",
+                params=params,
                 evidence=self.DEFAULT_EVIDENCE.get("assert", {}),
                 retry_policy=self.DEFAULT_RETRY.get("assert", {}),
                 on_fail="continue",
@@ -121,43 +129,32 @@ class PlanGenerator:
         step_id = f"s{num}"
         
         if action == "launch":
-            bundle_map = {
-                "Microsoft Edge": "com.microsoft.edgemac",
-                "Safari": "com.apple.Safari",
-                "Google Chrome": "com.google.Chrome",
-                "Firefox": "org.mozilla.firefox",
-                "Finder": "com.apple.finder",
-                "Terminal": "com.apple.Terminal",
-                "Notes": "com.apple.Notes",
-                "Mail": "com.apple.mail",
-            }
-            bundle_id = bundle_map.get(goal.target_app, goal.target_app)
             return PlanStep(
                 step_id=step_id,
-                action="launch_app",
+                action="launch",
                 target=goal.target_app,
-                params={"bundle_id": bundle_id},
+                params={"app": goal.target_app},
                 evidence=self.DEFAULT_EVIDENCE.get("launch", {}),
                 retry_policy=self.DEFAULT_RETRY.get("launch", {}),
                 on_fail="abort",
             )
-        
+
         elif action == "new_tab":
             return PlanStep(
                 step_id=step_id,
-                action="hotkey",
-                params={"keys": ["cmd", "t"]},
-                evidence=self.DEFAULT_EVIDENCE.get("new_tab", {}),
-                retry_policy=self.DEFAULT_RETRY.get("new_tab", {}),
+                action="shortcut",
+                params={"keys": self.SHORTCUTS["new_tab"]},
+                evidence=self.DEFAULT_EVIDENCE.get("shortcut", {}),
+                retry_policy=self.DEFAULT_RETRY.get("shortcut", {}),
                 on_fail="continue",
             )
-        
+
         elif action == "click":
             return PlanStep(
                 step_id=step_id,
-                action="element_click",
+                action="click",
                 target=goal.constraints.get("element", "element"),
-                params={"locator": goal.constraints.get("element", "")},
+                params={"selector": goal.constraints.get("element", "")},
                 evidence=self.DEFAULT_EVIDENCE.get("click", {}),
                 retry_policy=self.DEFAULT_RETRY.get("click", {}),
                 on_fail="replan",
@@ -166,7 +163,7 @@ class PlanGenerator:
         elif action == "type":
             return PlanStep(
                 step_id=step_id,
-                action="keyboard_type",
+                action="type",
                 params={"text": goal.constraints.get("text", "")},
                 evidence=self.DEFAULT_EVIDENCE.get("type", {}),
                 retry_policy=self.DEFAULT_RETRY.get("type", {}),
@@ -176,28 +173,32 @@ class PlanGenerator:
         elif action == "navigate":
             return PlanStep(
                 step_id=step_id,
-                action="navigate_url",
-                params={"url": goal.constraints.get("url", "")},
-                evidence=self.DEFAULT_EVIDENCE.get("navigate", {}),
-                retry_policy=self.DEFAULT_RETRY.get("navigate", {}),
+                action="type",
+                params={"text": goal.constraints.get("url", "")},
+                evidence=self.DEFAULT_EVIDENCE.get("type", {}),
+                retry_policy=self.DEFAULT_RETRY.get("type", {}),
                 on_fail="retry",
             )
-        
+
         elif action == "wait":
             return PlanStep(
                 step_id=step_id,
-                action="wait_explicit",
-                params={"duration_ms": goal.constraints.get("duration", 1000)},
+                action="wait",
+                params={"seconds": goal.constraints.get("duration", 1000) / 1000.0},
                 evidence={},
                 retry_policy={"max_attempts": 1},
                 on_fail="continue",
             )
         
         elif action == "assert":
+            params: Dict[str, Any] = {"condition": goal.expected_state or "window visible"}
+            if goal.constraints.get("element"):
+                params["locator"] = goal.constraints["element"]
+                params["strategy"] = "accessibility_id"
             return PlanStep(
                 step_id=step_id,
-                action="assert_visible",
-                params={"locator": goal.expected_state or "window", "strategy": "accessibility_id"},
+                action="assert",
+                params=params,
                 evidence=self.DEFAULT_EVIDENCE.get("assert", {}),
                 retry_policy=self.DEFAULT_RETRY.get("assert", {}),
                 on_fail="continue",
@@ -209,17 +210,17 @@ class PlanGenerator:
         """Generate preconditions for the plan."""
         preconditions = []
         
-        # macOS environment check
         preconditions.append({
-            "type": "environment",
-            "condition": "macos",
+            "check": "environment",
+            "expected": "macos",
+            "on_fail": "abort",
         })
-        
-        # App installed check if targeting specific app
+
         if goal.target_app:
             preconditions.append({
-                "type": "app_installed",
-                "app": goal.target_app,
+                "check": "app_installed",
+                "expected": goal.target_app,
+                "on_fail": "abort",
             })
         
         return preconditions

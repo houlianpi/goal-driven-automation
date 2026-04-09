@@ -31,6 +31,8 @@
     "metadata": {
       "type": "object",
       "properties": {
+        "goal_id": {"type": "string"},
+        "goal_type": {"type": "string"},
         "author": {"type": "string"},
         "tags": {"type": "array", "items": {"type": "string"}},
         "timeout_ms": {"type": "integer", "default": 60000}
@@ -40,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["check"],
+        "required": ["check", "expected"],
         "properties": {
           "check": {"type": "string"},
           "expected": {"type": "string"},
@@ -68,15 +70,7 @@
           "enum": ["launch", "shortcut", "type", "click", "wait", "assert", "capture"]
         },
         "params": {
-          "oneOf": [
-            {"$ref": "#/definitions/launch_params"},
-            {"$ref": "#/definitions/shortcut_params"},
-            {"$ref": "#/definitions/type_params"},
-            {"$ref": "#/definitions/click_params"},
-            {"$ref": "#/definitions/wait_params"},
-            {"$ref": "#/definitions/assert_params"},
-            {"$ref": "#/definitions/capture_params"}
-          ]
+          "type": "object"
         },
         "expected_signal": {
           "type": "string",
@@ -85,7 +79,7 @@
         "retry_policy": {"$ref": "#/definitions/retry_policy"},
         "on_fail": {
           "type": "string",
-          "enum": ["abort", "skip", "replan", "human_review"],
+          "enum": ["abort", "skip", "continue", "retry", "replan", "human_review"],
           "default": "abort"
         },
         "review_required": {
@@ -100,14 +94,45 @@
             "capture_ui_tree": {"type": "boolean"}
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"action": {"const": "launch"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/launch_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "shortcut"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/shortcut_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "type"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/type_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "click"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/click_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "wait"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/wait_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "assert"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/assert_params"}}}
+        },
+        {
+          "if": {"properties": {"action": {"const": "capture"}}},
+          "then": {"required": ["params"], "properties": {"params": {"$ref": "#/definitions/capture_params"}}}
+        }
+      ]
     },
     "launch_params": {
       "type": "object",
       "required": ["app"],
       "properties": {
         "app": {"type": "string", "description": "App name or bundle ID"}
-      }
+      },
+      "additionalProperties": false
     },
     "shortcut_params": {
       "type": "object",
@@ -118,7 +143,8 @@
           "items": {"type": "string"},
           "description": "Key combination, e.g. [\"command\", \"t\"]"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "type_params": {
       "type": "object",
@@ -126,7 +152,8 @@
       "properties": {
         "text": {"type": "string"},
         "delay_ms": {"type": "integer", "default": 50}
-      }
+      },
+      "additionalProperties": false
     },
     "click_params": {
       "type": "object",
@@ -135,7 +162,12 @@
         "x": {"type": "number"},
         "y": {"type": "number"},
         "button": {"type": "string", "enum": ["left", "right"], "default": "left"}
-      }
+      },
+      "anyOf": [
+        {"required": ["selector"]},
+        {"required": ["x", "y"]}
+      ],
+      "additionalProperties": false
     },
     "wait_params": {
       "type": "object",
@@ -143,22 +175,31 @@
         "seconds": {"type": "number"},
         "condition": {"type": "string"},
         "timeout_ms": {"type": "integer", "default": 10000}
-      }
+      },
+      "anyOf": [
+        {"required": ["seconds"]},
+        {"required": ["condition"]}
+      ],
+      "additionalProperties": false
     },
     "assert_params": {
       "type": "object",
       "required": ["condition"],
       "properties": {
         "condition": {"type": "string"},
-        "message": {"type": "string"}
-      }
+        "message": {"type": "string"},
+        "locator": {"type": "string"},
+        "strategy": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "capture_params": {
       "type": "object",
       "properties": {
         "type": {"type": "string", "enum": ["screenshot", "ui_tree", "both"]},
         "selector": {"type": "string"}
-      }
+      },
+      "additionalProperties": false
     },
     "retry_policy": {
       "type": "object",

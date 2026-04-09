@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """E2E Real Test - Uses actual fsq-mac CLI."""
 import subprocess
+import shlex
 import time
 from pathlib import Path
 from datetime import datetime
@@ -10,24 +11,25 @@ class RealE2ETest:
     def __init__(self, mac_cli: str = "mac"):
         self.mac_cli = mac_cli
     
-    def run_command(self, cmd: str, timeout: int = 30) -> dict:
-        print(f"  > {cmd}")
+    def run_command(self, cmd: list[str], timeout: int = 30) -> dict:
+        rendered = " ".join(shlex.quote(part) for part in cmd)
+        print(f"  > {rendered}")
         start = time.time()
         try:
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
+            result = subprocess.run(cmd, shell=False, capture_output=True, text=True, timeout=timeout)
             duration = int((time.time() - start) * 1000)
             success = result.returncode == 0
             print(f"    {'✓' if success else '✗'} ({duration}ms)")
             if result.stderr and not success:
                 print(f"    Error: {result.stderr[:100]}")
-            return {"command": cmd, "success": success, "exit_code": result.returncode,
+            return {"command": rendered, "argv": cmd, "success": success, "exit_code": result.returncode,
                     "stdout": result.stdout, "stderr": result.stderr, "duration_ms": duration}
         except subprocess.TimeoutExpired:
             print(f"    ✗ Timeout")
-            return {"command": cmd, "success": False, "error": "timeout"}
+            return {"command": rendered, "argv": cmd, "success": False, "error": "timeout"}
         except Exception as e:
             print(f"    ✗ Error: {e}")
-            return {"command": cmd, "success": False, "error": str(e)}
+            return {"command": rendered, "argv": cmd, "success": False, "error": str(e)}
     
     def test_finder_new_folder(self):
         """场景1: Finder 创建新文件夹"""
@@ -39,27 +41,27 @@ class RealE2ETest:
         steps = []
         
         print("\n[Step 1] 启动 Finder...")
-        result = self.run_command(f"{self.mac_cli} app launch com.apple.finder")
+        result = self.run_command([self.mac_cli, "app", "launch", "com.apple.finder"])
         steps.append(result)
         time.sleep(1.5)
         
         print("\n[Step 2] 切换到桌面 (Cmd+Shift+D)...")
-        result = self.run_command(f"{self.mac_cli} input hotkey command+shift+d")
+        result = self.run_command([self.mac_cli, "input", "hotkey", "command", "shift", "d"])
         steps.append(result)
         time.sleep(0.5)
         
         print("\n[Step 3] 创建新文件夹 (Cmd+Shift+N)...")
-        result = self.run_command(f"{self.mac_cli} input hotkey command+shift+n")
+        result = self.run_command([self.mac_cli, "input", "hotkey", "command", "shift", "n"])
         steps.append(result)
         time.sleep(0.5)
         
         print(f"\n[Step 4] 输入文件夹名: {test_folder}...")
-        result = self.run_command(f'{self.mac_cli} input text "{test_folder}"')
+        result = self.run_command([self.mac_cli, "input", "text", test_folder])
         steps.append(result)
         time.sleep(0.3)
         
         print("\n[Step 5] 按 Enter 确认...")
-        result = self.run_command(f"{self.mac_cli} input key return")
+        result = self.run_command([self.mac_cli, "input", "key", "return"])
         steps.append(result)
         time.sleep(0.5)
         

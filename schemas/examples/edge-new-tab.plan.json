@@ -28,7 +28,7 @@
     {
       "step_id": "step-4-verify",
       "action": "assert",
-      "params": {"condition": "tab_count > baseline.tab_count"},
+      "params": {"condition": "tab_count > baseline.tab_count", "locator": "New Tab"},
       "review_required": true
     }
   ]

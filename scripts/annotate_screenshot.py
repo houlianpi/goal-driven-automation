@@ -52,7 +52,7 @@ def annotate(img_path, action_type, output_path=None, custom_box=None, custom_la
     # Draw label background
     try:
         font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", int(16 * scale))
-    except:
+    except (OSError, IOError):
         font = ImageFont.load_default()
     
     label_bbox = draw.textbbox((0, 0), label, font=font)

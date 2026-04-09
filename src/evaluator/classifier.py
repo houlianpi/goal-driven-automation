@@ -100,7 +100,7 @@ class FailureClassifier:
         FailureClassification.ASSERTION_FAILED: (RepairStrategy.HUMAN_REVIEW, False, True),
     }
     
-    def classify(self, step: StepEvidence) -> ClassificationResult:
+    def classify(self, step: StepEvidence) -> Optional[ClassificationResult]:
         """
         Classify a failed step.
         
@@ -110,15 +110,8 @@ class FailureClassifier:
         Returns:
             ClassificationResult with classification and recommendations
         """
-        if step.status == StepStatus.SUCCESS:
-            return ClassificationResult(
-                classification=FailureClassification.ASSERTION_FAILED,  # placeholder
-                confidence=1.0,
-                recommended_strategy=RepairStrategy.SKIP,
-                details="Step succeeded, no classification needed",
-                retry_likely_to_help=False,
-                requires_human=False,
-            )
+        if step.status in {StepStatus.SUCCESS, StepStatus.REPAIRED, StepStatus.SKIPPED}:
+            return None
         
         # Use existing error classification if available
         if step.error:
@@ -167,4 +160,4 @@ class FailureClassifier:
     
     def classify_batch(self, steps: List[StepEvidence]) -> List[ClassificationResult]:
         """Classify multiple failed steps."""
-        return [self.classify(s) for s in steps if s.status != StepStatus.SUCCESS]
+        return [result for s in steps if s.status == StepStatus.FAILURE for result in [self.classify(s)] if result is not None]

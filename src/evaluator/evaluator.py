@@ -57,6 +57,7 @@ class EvaluationResult:
     total_steps: int
     passed_steps: int
     failed_steps: int
+    partial_steps: int = 0
     step_evaluations: List[StepEvaluation] = field(default_factory=list)
     failure_summary: str = ""
     confidence: float = 1.0
@@ -69,6 +70,7 @@ class EvaluationResult:
             "total_steps": self.total_steps,
             "passed_steps": self.passed_steps,
             "failed_steps": self.failed_steps,
+            "partial_steps": self.partial_steps,
             "step_evaluations": [s.to_dict() for s in self.step_evaluations],
             "failure_summary": self.failure_summary,
             "confidence": self.confidence,
@@ -94,6 +96,7 @@ class Evaluator:
         step_evals = []
         passed = 0
         failed = 0
+        partial = 0
         classifications = []
         
         for step in evidence.steps:
@@ -105,10 +108,28 @@ class Evaluator:
                     expected_outcome="success",
                     actual_outcome="success",
                 )
+            elif step.status == StepStatus.REPAIRED:
+                passed += 1
+                partial += 1
+                eval_result = StepEvaluation(
+                    step_id=step.step_id,
+                    passed=True,
+                    expected_outcome="success",
+                    actual_outcome="repaired",
+                )
+            elif step.status == StepStatus.SKIPPED:
+                partial += 1
+                eval_result = StepEvaluation(
+                    step_id=step.step_id,
+                    passed=False,
+                    expected_outcome="success",
+                    actual_outcome="skipped",
+                )
             else:
                 failed += 1
                 classification = self.classifier.classify(step)
-                classifications.append(classification)
+                if classification is not None:
+                    classifications.append(classification)
                 eval_result = StepEvaluation(
                     step_id=step.step_id,
                     passed=False,
@@ -119,10 +140,14 @@ class Evaluator:
             step_evals.append(eval_result)
         
         # Determine verdict
-        if failed == 0:
+        if failed == 0 and partial == 0:
             verdict = EvaluationVerdict.PASS
             next_action = NextAction.DONE
             failure_summary = ""
+        elif failed == 0:
+            verdict = EvaluationVerdict.PARTIAL
+            next_action = NextAction.DONE
+            failure_summary = self._summarize_non_terminal_steps(step_evals)
         elif passed > 0:
             verdict = EvaluationVerdict.PARTIAL
             next_action, failure_summary = self._determine_next_action(classifications)
@@ -146,10 +171,16 @@ class Evaluator:
             total_steps=len(evidence.steps),
             passed_steps=passed,
             failed_steps=failed,
+            partial_steps=partial,
             step_evaluations=step_evals,
             failure_summary=failure_summary,
             confidence=confidence,
         )
+
+    def _summarize_non_terminal_steps(self, evaluations: List[StepEvaluation]) -> str:
+        """Summarize repaired or skipped steps without treating them as failures."""
+        details = [f"{step.step_id}: {step.actual_outcome}" for step in evaluations if step.actual_outcome in {"repaired", "skipped"}]
+        return "; ".join(details[:3])
     
     def _determine_next_action(self, classifications: List[ClassificationResult]) -> tuple:
         """Determine the best next action based on failure classifications."""
@@ -196,12 +227,12 @@ class Evaluator:
     def should_retry(self, evidence: RunEvidence) -> bool:
         """Quick check if retry is likely to help."""
         for step in evidence.steps:
-            if step.status != StepStatus.SUCCESS:
+            if step.status == StepStatus.FAILURE:
                 classification = self.classifier.classify(step)
-                if classification.retry_likely_to_help:
+                if classification and classification.retry_likely_to_help:
                     return True
         return False
     
     def get_failed_steps(self, evidence: RunEvidence) -> List[str]:
         """Get list of failed step IDs."""
-        return [s.step_id for s in evidence.steps if s.status != StepStatus.SUCCESS]
+        return [s.step_id for s in evidence.steps if s.status == StepStatus.FAILURE]

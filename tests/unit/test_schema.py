@@ -71,11 +71,24 @@ class TestSchemaValidator:
             "version": "1.0.0",
             "goal": "Test",
             "app": "Safari",
-            "steps": [{"step_id": "s1", "action": "launch"}]
+            "steps": [{"step_id": "s1", "action": "launch", "params": {"app": "Safari"}}]
         }
         is_valid, errors = validator.validate_plan(plan)
         assert is_valid is False
         assert any("plan_id" in e for e in errors)
+
+    def test_validate_plan_rejects_mismatched_params(self, validator):
+        """Test action-specific params validation."""
+        plan = {
+            "plan_id": "plan-test-mismatch",
+            "version": "1.0.0",
+            "goal": "Test",
+            "app": "Safari",
+            "steps": [{"step_id": "s1", "action": "launch", "params": {"keys": ["command", "t"]}}]
+        }
+        is_valid, errors = validator.validate_plan(plan)
+        assert is_valid is False
+        assert any("app" in e for e in errors)
     
     def test_validate_valid_evidence(self, validator):
         """Test validating valid Evidence."""
@@ -171,11 +184,11 @@ class TestHelperFunctions:
             "version": "1.0.0",
             "goal": "Test",
             "app": "Safari",
-            "steps": [{"step_id": "s1", "action": "launch"}]
+            "steps": [{"step_id": "s1", "action": "launch", "params": {"app": "Safari"}}]
         }
         is_valid, errors = validate_plan(plan)
         assert is_valid is True
-    
+
     def test_validate_evidence_function(self):
         """Test validate_evidence helper."""
         evidence = {

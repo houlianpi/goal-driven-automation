@@ -1,6 +1,7 @@
 """Unit tests for Executor."""
 import pytest
 from unittest.mock import patch, MagicMock
+from src.evidence.types import RunEvidence, RunStatus
 from src.executor.executor import Executor, StepResult, PlanResult, execute_command
 
 
@@ -10,7 +11,7 @@ class TestExecutor:
     def test_execute_simple_command(self):
         """Test executing a simple command."""
         executor = Executor()
-        result = executor.execute_command("echo hello")
+        result = executor.execute_command(["echo", "hello"])
         assert result["return_code"] == 0
         assert "hello" in result["stdout"]
         assert result["duration_ms"] >= 0
@@ -18,7 +19,7 @@ class TestExecutor:
     def test_execute_failing_command(self):
         """Test executing a failing command."""
         executor = Executor()
-        result = executor.execute_command("false")
+        result = executor.execute_command(["false"])
         assert result["return_code"] != 0
     
     def test_execute_step_success(self):
@@ -27,6 +28,7 @@ class TestExecutor:
         step = {
             "step_id": "s1",
             "command": "echo success",
+            "argv": ["echo", "success"],
             "retry_policy": {"max": 1},
         }
         result = executor.execute_step(step)
@@ -38,7 +40,8 @@ class TestExecutor:
         executor = Executor()
         step = {
             "step_id": "s2",
-            "command": "false",  # Always fails
+            "command": "false",
+            "argv": ["false"],
             "retry_policy": {"max": 2, "backoff": "none", "delay_ms": 10},
         }
         result = executor.execute_step(step)
@@ -59,8 +62,8 @@ class TestExecutor:
         plan = {
             "plan_id": "test_plan",
             "steps": [
-                {"step_id": "s1", "command": "echo step1"},
-                {"step_id": "s2", "command": "echo step2"},
+                {"step_id": "s1", "command": "echo step1", "argv": ["echo", "step1"]},
+                {"step_id": "s2", "command": "echo step2", "argv": ["echo", "step2"]},
             ],
         }
         result = executor.execute_plan(plan)
@@ -73,9 +76,9 @@ class TestExecutor:
         plan = {
             "plan_id": "test_plan",
             "steps": [
-                {"step_id": "s1", "command": "echo ok"},
-                {"step_id": "s2", "command": "false", "on_fail": "abort"},
-                {"step_id": "s3", "command": "echo never"},
+                {"step_id": "s1", "command": "echo ok", "argv": ["echo", "ok"]},
+                {"step_id": "s2", "command": "false", "argv": ["false"], "on_fail": "abort"},
+                {"step_id": "s3", "command": "echo never", "argv": ["echo", "never"]},
             ],
         }
         result = executor.execute_plan(plan)
@@ -89,14 +92,33 @@ class TestExecutor:
         plan = {
             "plan_id": "test_plan",
             "steps": [
-                {"step_id": "s1", "command": "echo ok"},
-                {"step_id": "s2", "command": "false", "on_fail": "skip"},
-                {"step_id": "s3", "command": "echo continued"},
+                {"step_id": "s1", "command": "echo ok", "argv": ["echo", "ok"]},
+                {"step_id": "s2", "command": "false", "argv": ["false"], "on_fail": "skip"},
+                {"step_id": "s3", "command": "echo continued", "argv": ["echo", "continued"]},
             ],
         }
         result = executor.execute_plan(plan)
         assert len(result.step_results) == 3  # All executed
         assert result.step_results[2].success is True
+
+    def test_execute_returns_run_evidence(self):
+        """Test unified execute() returns RunEvidence."""
+        executor = Executor()
+        plan = {
+            "plan_id": "test_plan",
+            "steps": [
+                {"step_id": "s1", "action": "launch_app", "command": "echo ok", "argv": ["echo", "ok"]},
+                {"step_id": "s2", "action": "hotkey", "command": "echo done", "argv": ["echo", "done"]},
+            ],
+        }
+
+        result = executor.execute(plan, run_id="run-fixed")
+
+        assert isinstance(result, RunEvidence)
+        assert result.run_id == "run-fixed"
+        assert result.plan_id == "test_plan"
+        assert result.status == RunStatus.SUCCESS
+        assert len(result.steps) == 2
 
 
 class TestStepResult:
@@ -138,8 +160,19 @@ class TestPlanResult:
 
 class TestHelperFunctions:
     """Test module-level helper functions."""
-    
+
     def test_execute_command_function(self):
         """Test execute_command helper."""
-        result = execute_command("echo hello")
+        result = execute_command(["echo", "hello"])
         assert result["return_code"] == 0
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_command_uses_argv_without_shell(self, mock_run):
+        """Test executor uses structured argv execution."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+
+        executor = Executor()
+        executor.execute_command(["echo", "ok"])
+
+        _, kwargs = mock_run.call_args
+        assert kwargs["shell"] is False

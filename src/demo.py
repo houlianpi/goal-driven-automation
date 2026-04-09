@@ -44,6 +44,7 @@ def run_demo(goal_text: str, force_failure_step: str = None):
     print(f"  Compiled {len(compiled['steps'])} steps")
     for step in compiled['steps']:
         print(f"    - {step.get('command', 'N/A')}")
+        print(f"      argv={step.get('argv', [])}")
     
     # Stage 4: Execute (Mock)
     print("\n[4/7] Executing Plan (Mock)...")
@@ -52,7 +53,7 @@ def run_demo(goal_text: str, force_failure_step: str = None):
         print(f"  [!] Forcing failure on step: {force_failure_step}")
         executor.force_failure(force_failure_step, "timeout")
     
-    evidence = executor.execute(plan)
+    evidence = executor.execute(compiled)
     print(f"  Run ID: {evidence.run_id}")
     print(f"  Status: {evidence.status.value}")
     for step in evidence.steps:

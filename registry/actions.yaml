@@ -33,7 +33,7 @@ actions:
     description: Activate/focus an application
     args:
       app_name: {type: string, required: true, description: "Application name"}
-    compile_to: osascript -e 'tell application "{app_name}" to activate'
+    compile_to: osascript -e 'tell application {app_name} to activate'
     expected_evidence: [process_running]
     preconditions: [session_active]
     default_retry: {max: 3, backoff: linear}
@@ -69,7 +69,7 @@ actions:
     args:
       locator: {type: string, required: true, description: "Element locator"}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element click "{locator}" --strategy {strategy}
+    compile_to: mac element click {locator} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     preconditions: [session_active, app_focused]
     default_retry: {max: 3, backoff: linear}
@@ -81,7 +81,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element right-click "{locator}" --strategy {strategy}
+    compile_to: mac element right-click {locator} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     default_retry: {max: 2, backoff: linear}
     danger_level: safe
@@ -92,7 +92,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element double-click "{locator}" --strategy {strategy}
+    compile_to: mac element double-click {locator} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     default_retry: {max: 2, backoff: linear}
     danger_level: safe
@@ -104,7 +104,7 @@ actions:
       locator: {type: string, required: true}
       text: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element type "{locator}" "{text}" --strategy {strategy}
+    compile_to: mac element type {locator} {text} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     default_retry: {max: 2, backoff: none}
     danger_level: safe
@@ -116,7 +116,7 @@ actions:
       locator: {type: string, required: true}
       direction: {type: string, required: true, enum: [up, down, left, right]}
       amount: {type: integer, required: false, default: 100}
-    compile_to: mac element scroll "{locator}" --direction {direction} --amount {amount}
+    compile_to: mac element scroll {locator} --direction {direction} --amount {amount}
     expected_evidence: [command_output]
     default_retry: {max: 2, backoff: none}
     danger_level: safe
@@ -127,7 +127,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element hover "{locator}" --strategy {strategy}
+    compile_to: mac element hover {locator} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     default_retry: {max: 2, backoff: linear}
     danger_level: safe
@@ -138,7 +138,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac element find "{locator}" --strategy {strategy}
+    compile_to: mac element find {locator} --strategy {strategy}
     expected_evidence: [element_found, command_output]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe
@@ -162,7 +162,7 @@ actions:
     description: Type text directly (no element focus)
     args:
       text: {type: string, required: true}
-    compile_to: mac input type "{text}"
+    compile_to: mac input type {text}
     expected_evidence: [command_output]
     preconditions: [session_active]
     default_retry: {max: 2, backoff: none}
@@ -177,7 +177,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac assert visible "{locator}" --strategy {strategy}
+    compile_to: mac assert visible {locator} --strategy {strategy}
     expected_evidence: [assertion_result, element_found]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe
@@ -188,7 +188,7 @@ actions:
     args:
       locator: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac assert enabled "{locator}" --strategy {strategy}
+    compile_to: mac assert enabled {locator} --strategy {strategy}
     expected_evidence: [assertion_result]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe
@@ -200,7 +200,7 @@ actions:
       locator: {type: string, required: true}
       expected: {type: string, required: true}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac assert text "{locator}" "{expected}" --strategy {strategy}
+    compile_to: mac assert text {locator} {expected} --strategy {strategy}
     expected_evidence: [assertion_result]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe
@@ -211,7 +211,7 @@ actions:
     args:
       locator: {type: string, required: true}
       expected: {type: string, required: true}
-    compile_to: mac assert value "{locator}" "{expected}"
+    compile_to: mac assert value {locator} {expected}
     expected_evidence: [assertion_result]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe
@@ -259,7 +259,7 @@ actions:
       locator: {type: string, required: true}
       timeout_ms: {type: integer, required: false, default: 10000}
       strategy: {type: string, required: false, default: "accessibility_id"}
-    compile_to: mac wait element "{locator}" --timeout {timeout_ms} --strategy {strategy}
+    compile_to: mac wait element {locator} --timeout {timeout_ms} --strategy {strategy}
     expected_evidence: [element_found]
     default_retry: {max: 1, backoff: none}
     danger_level: safe
@@ -286,7 +286,7 @@ actions:
     description: Focus a window by title
     args:
       title: {type: string, required: true}
-    compile_to: mac window focus "{title}"
+    compile_to: mac window focus {title}
     expected_evidence: [command_output]
     default_retry: {max: 3, backoff: linear}
     danger_level: safe

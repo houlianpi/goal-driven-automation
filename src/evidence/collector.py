@@ -4,7 +4,7 @@ Evidence Collector - Captures evidence during step execution.
 import subprocess
 import time
 import json
-from datetime import datetime
+import shlex
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -16,6 +16,7 @@ from .types import (
     StepError,
     FailureClassification,
 )
+from src.time_utils import utc_now
 
 
 class EvidenceCollector:
@@ -68,14 +69,14 @@ class EvidenceCollector:
         return None
     
     def execute_and_collect(
-        self, step_id: str, action: str, command: str,
+        self, step_id: str, action: str, command: List[str],
         evidence_config: Optional[Dict[str, bool]] = None,
         retry_policy: Optional[Dict[str, Any]] = None,
     ) -> StepEvidence:
         evidence_config = evidence_config or {}
         retry_policy = retry_policy or {"max_attempts": 1}
         
-        started_at = datetime.utcnow()
+        started_at = utc_now()
         artifacts: List[Artifact] = []
         
         if evidence_config.get("screenshot_before"):
@@ -90,24 +91,25 @@ class EvidenceCollector:
         delay_ms = retry_policy.get("delay_ms", 1000)
         last_result = None
         retry_count = 0
-        
+        display_command = self._render_command(command)
+
         for attempt in range(max_attempts):
             start_time = time.time()
             try:
-                result = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=60)
+                result = subprocess.run(command, shell=False, capture_output=True, text=True, timeout=60)
                 duration_ms = int((time.time() - start_time) * 1000)
                 last_result = CLICommand(
-                    command=command.split(), exit_code=result.returncode,
+                    command=command, exit_code=result.returncode,
                     stdout=result.stdout, stderr=result.stderr, duration_ms=duration_ms,
                 )
                 if result.returncode == 0:
                     break
             except subprocess.TimeoutExpired:
                 duration_ms = int((time.time() - start_time) * 1000)
-                last_result = CLICommand(command=command.split(), exit_code=-1, stderr="Timeout", duration_ms=duration_ms)
+                last_result = CLICommand(command=command, exit_code=-1, stderr="Timeout", duration_ms=duration_ms)
             except Exception as e:
                 duration_ms = int((time.time() - start_time) * 1000)
-                last_result = CLICommand(command=command.split(), exit_code=-2, stderr=str(e), duration_ms=duration_ms)
+                last_result = CLICommand(command=command, exit_code=-2, stderr=str(e), duration_ms=duration_ms)
             
             retry_count = attempt + 1
             if attempt < max_attempts - 1:
@@ -118,7 +120,7 @@ class EvidenceCollector:
             if artifact := self.capture_screenshot(step_id, "after"):
                 artifacts.append(artifact)
         
-        finished_at = datetime.utcnow()
+        finished_at = utc_now()
         status = StepStatus.SUCCESS if last_result and last_result.exit_code == 0 else StepStatus.FAILURE
         error = self._classify_error(last_result) if status == StepStatus.FAILURE else None
         
@@ -130,6 +132,10 @@ class EvidenceCollector:
             duration_ms=int((finished_at - started_at).total_seconds() * 1000),
             cli_command=last_result, error=error, artifacts=artifacts, retry_count=retry_count,
         )
+
+    def _render_command(self, command: List[str]) -> str:
+        """Render argv for logs and debugging."""
+        return " ".join(shlex.quote(part) for part in command)
     
     def _classify_error(self, cli_result: Optional[CLICommand]) -> Optional[StepError]:
         if not cli_result or cli_result.exit_code == 0:
@@ -149,7 +155,7 @@ class EvidenceCollector:
     
     def _log_command(self, step_id: str, cli_result: Optional[CLICommand]):
         log_path = self.run_dir / "logs" / "cli_commands.jsonl"
-        entry = {"timestamp": datetime.utcnow().isoformat(), "step_id": step_id,
+        entry = {"timestamp": utc_now().isoformat(), "step_id": step_id,
                  "command": cli_result.command if cli_result else None,
                  "exit_code": cli_result.exit_code if cli_result else None}
         with open(log_path, "a") as f:
@@ -158,4 +164,4 @@ class EvidenceCollector:
     def _log_error(self, message: str):
         log_path = self.run_dir / "logs" / "errors.log"
         with open(log_path, "a") as f:
-            f.write(f"{datetime.utcnow().isoformat()} - {message}\n")
+            f.write(f"{utc_now().isoformat()} - {message}\n")

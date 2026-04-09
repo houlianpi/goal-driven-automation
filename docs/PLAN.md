@@ -22,21 +22,20 @@
 │  {                                                       │
 │    "goal": "...",                                        │
 │    "steps": [                                            │
-│      { "action": "launch", "app": "Edge" },              │
-│      { "action": "shortcut", "keys": "Cmd+T" },          │
-│      { "action": "type", "text": "github.com" },         │
-│      { "action": "shortcut", "keys": "Enter" }           │
+│      { "action": "launch", "params": {"app": "Edge"} }, │
+│      { "action": "shortcut", "params": {"keys": ["command", "t"]} }, │
+│      { "action": "type", "params": {"text": "github.com"} }, │
+│      { "action": "shortcut", "params": {"keys": ["return"]} } │
 │    ]                                                     │
 │  }                                                       │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    fsq-mac CLI                           │
-│  mac launch Edge                                         │
-│  mac keys Cmd+T                                          │
-│  mac type "github.com"                                   │
-│  mac keys Enter                                          │
+│         Compiler -> Capability Registry -> fsq-mac CLI   │
+│  launch   -> launch_app    -> mac app launch <bundle>    │
+│  shortcut -> hotkey        -> mac input hotkey ...       │
+│  type     -> type_text     -> mac input type ...         │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼

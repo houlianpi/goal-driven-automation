@@ -15,8 +15,15 @@ class TestFailureClassifier:
     
     def test_classify_success(self, classifier):
         step = StepEvidence(step_id="s1", action="launch", status=StepStatus.SUCCESS)
-        result = classifier.classify(step)
-        assert result.details == "Step succeeded, no classification needed"
+        assert classifier.classify(step) is None
+
+    def test_classify_repaired(self, classifier):
+        step = StepEvidence(step_id="s1", action="click", status=StepStatus.REPAIRED)
+        assert classifier.classify(step) is None
+
+    def test_classify_skipped(self, classifier):
+        step = StepEvidence(step_id="s1", action="click", status=StepStatus.SKIPPED)
+        assert classifier.classify(step) is None
     
     def test_classify_with_error(self, classifier):
         error = StepError("Timeout", "Command timed out", FailureClassification.ENVIRONMENT_FAILURE)
@@ -72,6 +79,30 @@ class TestEvaluator:
         assert result.verdict == EvaluationVerdict.PARTIAL
         assert result.passed_steps == 1
         assert result.failed_steps == 1
+
+    def test_evaluate_repaired_step_is_passed_but_partial(self, evaluator):
+        run = RunEvidence(plan_id="plan-test")
+        run.add_step(StepEvidence(step_id="s1", action="launch", status=StepStatus.SUCCESS))
+        run.add_step(StepEvidence(step_id="s2", action="click", status=StepStatus.REPAIRED))
+
+        result = evaluator.evaluate(run)
+
+        assert result.verdict == EvaluationVerdict.PARTIAL
+        assert result.next_action == NextAction.DONE
+        assert result.passed_steps == 2
+        assert result.failed_steps == 0
+
+    def test_evaluate_skipped_step_is_partial_without_retry(self, evaluator):
+        run = RunEvidence(plan_id="plan-test")
+        run.add_step(StepEvidence(step_id="s1", action="launch", status=StepStatus.SUCCESS))
+        run.add_step(StepEvidence(step_id="s2", action="click", status=StepStatus.SKIPPED))
+
+        result = evaluator.evaluate(run)
+
+        assert result.verdict == EvaluationVerdict.PARTIAL
+        assert result.next_action == NextAction.DONE
+        assert result.passed_steps == 1
+        assert result.failed_steps == 0
     
     def test_evaluate_all_failure(self, evaluator):
         run = RunEvidence(plan_id="plan-test")
@@ -94,6 +125,12 @@ class TestEvaluator:
         error = StepError("Timeout", "timed out", FailureClassification.ENVIRONMENT_FAILURE)
         run.add_step(StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error))
         assert evaluator.should_retry(run) is True
+
+    def test_should_not_retry_repaired_or_skipped_steps(self, evaluator):
+        run = RunEvidence(plan_id="plan-test")
+        run.add_step(StepEvidence(step_id="s1", action="click", status=StepStatus.REPAIRED))
+        run.add_step(StepEvidence(step_id="s2", action="assert", status=StepStatus.SKIPPED))
+        assert evaluator.should_retry(run) is False
     
     def test_get_failed_steps(self, evaluator):
         run = RunEvidence(plan_id="plan-test")
@@ -102,3 +139,11 @@ class TestEvaluator:
         run.add_step(StepEvidence(step_id="s3", action="type", status=StepStatus.FAILURE))
         failed = evaluator.get_failed_steps(run)
         assert failed == ["s2", "s3"]
+
+    def test_get_failed_steps_excludes_repaired_and_skipped(self, evaluator):
+        run = RunEvidence(plan_id="plan-test")
+        run.add_step(StepEvidence(step_id="s1", action="launch", status=StepStatus.REPAIRED))
+        run.add_step(StepEvidence(step_id="s2", action="click", status=StepStatus.SKIPPED))
+        run.add_step(StepEvidence(step_id="s3", action="type", status=StepStatus.FAILURE))
+        failed = evaluator.get_failed_steps(run)
+        assert failed == ["s3"]

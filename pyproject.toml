@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goal-driven-automation"
+version = "0.1.0"
+description = "AI-driven macOS automation pipeline for goal-to-command execution"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "PyYAML>=6.0",
+  "jsonschema>=4.0",
+  "Pillow>=10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.24",
+]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = [
+  "src",
+  "src.compiler",
+  "src.evaluator",
+  "src.evidence",
+  "src.executor",
+  "src.goal_interpreter",
+  "src.memory",
+  "src.pipeline",
+  "src.planner",
+  "src.repair",
+  "src.schema",
+  "src.schemas",
+]

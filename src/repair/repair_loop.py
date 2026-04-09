@@ -145,9 +145,11 @@ class RepairLoop:
         failed_count = len(self._get_failed_steps(current_evidence))
         original_failed = len(self._get_failed_steps(evidence))
         
+        remaining_partial = any(step.status in {StepStatus.REPAIRED, StepStatus.SKIPPED} for step in current_evidence.steps)
+
         if failed_count == 0:
             outcome = RepairOutcome.RECOVERED
-            current_evidence.status = RunStatus.SUCCESS
+            current_evidence.status = RunStatus.PARTIAL if remaining_partial else RunStatus.SUCCESS
         elif failed_count < original_failed:
             outcome = RepairOutcome.PARTIAL
             current_evidence.status = RunStatus.PARTIAL
@@ -180,21 +182,8 @@ class RepairLoop:
         return [s for s in evidence.steps if s.status == StepStatus.FAILURE]
     
     def _clone_evidence(self, evidence: RunEvidence) -> RunEvidence:
-        """Create a shallow copy of evidence for modification."""
-        return RunEvidence(
-            evidence_id=evidence.evidence_id,
-            plan_id=evidence.plan_id,
-            run_id=evidence.run_id,
-            status=evidence.status,
-            started_at=evidence.started_at,
-            finished_at=evidence.finished_at,
-            duration_ms=evidence.duration_ms,
-            environment=evidence.environment,
-            steps=list(evidence.steps),
-            assertions=list(evidence.assertions),
-            repairs=list(evidence.repairs),
-            artifacts_dir=evidence.artifacts_dir,
-        )
+        """Create a detached evidence copy for modification."""
+        return evidence.clone()
     
     def _update_step(self, evidence: RunEvidence, new_step: StepEvidence):
         """Update a step in evidence with repaired version."""

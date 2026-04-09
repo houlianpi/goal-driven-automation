@@ -24,6 +24,8 @@
 | wait | seconds/condition | 等待 |
 | assert | condition | 断言验证 |
 
+`Plan IR` 使用语义动作作为稳定契约，能力层动作如 `launch_app`、`hotkey`、`assert_visible` 只存在于注册表和编译产物中。
+
 ## Evidence Schema
 
 记录执行结果和证据。

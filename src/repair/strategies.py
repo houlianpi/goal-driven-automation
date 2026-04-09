@@ -63,15 +63,13 @@ class RetryStrategy(RepairStrategyBase):
         """Retry the command."""
         if not step.cli_command:
             return StrategyResult(success=False, details="No command to retry")
-        
-        command = " ".join(step.cli_command.command)
-        
+
         for attempt in range(self.max_retries):
             time.sleep(self.backoff_ms * (attempt + 1) / 1000.0)
             
             try:
                 result = subprocess.run(
-                    command, shell=True, capture_output=True, text=True, timeout=60
+                    step.cli_command.command, shell=False, capture_output=True, text=True, timeout=60
                 )
                 if result.returncode == 0:
                     from src.evidence.types import CLICommand
@@ -140,9 +138,8 @@ class RestartStrategy(RepairStrategyBase):
             
             # Retry the original command
             if step.cli_command:
-                command = " ".join(step.cli_command.command)
                 result = subprocess.run(
-                    command, shell=True, capture_output=True, text=True, timeout=60
+                    step.cli_command.command, shell=False, capture_output=True, text=True, timeout=60
                 )
                 if result.returncode == 0:
                     from src.evidence.types import CLICommand

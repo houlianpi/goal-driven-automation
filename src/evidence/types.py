@@ -1,11 +1,14 @@
 """
 Evidence Types - Data classes for evidence artifacts.
 """
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 import uuid
+
+from src.time_utils import utc_now
 
 
 class StepStatus(Enum):
@@ -39,7 +42,7 @@ class Artifact:
     """A captured artifact (screenshot, UI tree, etc.)."""
     type: str  # screenshot, ui_tree, log
     path: str  # Relative path within run directory
-    captured_at: datetime = field(default_factory=datetime.utcnow)
+    captured_at: datetime = field(default_factory=utc_now)
     metadata: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -93,7 +96,7 @@ class StepEvidence:
     step_id: str
     action: str
     status: StepStatus
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=utc_now)
     finished_at: Optional[datetime] = None
     duration_ms: int = 0
     cli_command: Optional[CLICommand] = None
@@ -116,9 +119,7 @@ class StepEvidence:
         if self.error:
             result["error"] = self.error.to_dict()
         if self.artifacts:
-            result["evidence"] = {
-                a.type: a.path for a in self.artifacts
-            }
+            result["artifacts"] = [artifact.to_dict() for artifact in self.artifacts]
         return result
 
 
@@ -143,6 +144,9 @@ class AssertionResult:
             "expected_value": self.expected_value,
             "review_required": self.review_required,
         }
+
+
+AssertionResultLegacy = AssertionResult
 
 
 @dataclass
@@ -191,7 +195,7 @@ class RunEvidence:
     run_id: str = field(default_factory=lambda: f"run-{uuid.uuid4().hex[:8]}")
     version: str = "1.0.0"
     status: RunStatus = RunStatus.SUCCESS
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=utc_now)
     finished_at: Optional[datetime] = None
     duration_ms: int = 0
     environment: Optional[Environment] = None
@@ -205,12 +209,12 @@ class RunEvidence:
         self.steps.append(step)
         if step.status == StepStatus.FAILURE:
             self.status = RunStatus.FAILURE
-        elif step.status == StepStatus.REPAIRED and self.status == RunStatus.SUCCESS:
+        elif step.status in {StepStatus.REPAIRED, StepStatus.SKIPPED} and self.status == RunStatus.SUCCESS:
             self.status = RunStatus.PARTIAL
     
     def finalize(self):
         """Finalize the run evidence."""
-        self.finished_at = datetime.utcnow()
+        self.finished_at = utc_now()
         if self.started_at:
             self.duration_ms = int((self.finished_at - self.started_at).total_seconds() * 1000)
     
@@ -239,3 +243,7 @@ class RunEvidence:
                 "logs_dir": f"{self.artifacts_dir}/logs/",
             }
         return result
+
+    def clone(self) -> "RunEvidence":
+        """Create a detached deep copy for repair and mutation flows."""
+        return deepcopy(self)
