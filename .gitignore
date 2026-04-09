@@ -1,0 +1,16 @@
+# Runs directory (local execution artifacts)
+runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
