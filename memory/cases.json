@@ -1,0 +1,48 @@
+{
+  "cases": [
+    {
+      "case_id": "pattern-plan-b415dd39",
+      "case_type": "success_pattern",
+      "pattern": {
+        "plan_id": "plan-b415dd39",
+        "action_sequence": [
+          "launch_app",
+          "hotkey"
+        ],
+        "step_count": 2
+      },
+      "success_count": 1,
+      "failure_count": 0,
+      "confidence": 1.0,
+      "last_used": null,
+      "created_at": "2026-04-09T06:47:52.262138",
+      "tags": [
+        "hotkey",
+        "launch_app"
+      ],
+      "metadata": {}
+    },
+    {
+      "case_id": "pattern-plan-51e0232a",
+      "case_type": "success_pattern",
+      "pattern": {
+        "plan_id": "plan-51e0232a",
+        "action_sequence": [
+          "launch_app",
+          "assert_visible"
+        ],
+        "step_count": 2
+      },
+      "success_count": 1,
+      "failure_count": 0,
+      "confidence": 1.0,
+      "last_used": null,
+      "created_at": "2026-04-09T06:48:03.460050",
+      "tags": [
+        "assert_visible",
+        "launch_app"
+      ],
+      "metadata": {}
+    }
+  ]
+}
