@@ -1,0 +1,71 @@
+{
+  "version": "1.0.0",
+  "scenarios": [
+    {
+      "id": "edge-new-tab",
+      "name": "Edge New Tab",
+      "category": "tab_management",
+      "goal": "Open Edge and create a new tab",
+      "expected_outcome": "Edge opens with a new tab visible",
+      "validation": {
+        "type": "ui_state",
+        "conditions": ["tab_count > 1", "new_tab_page_visible"]
+      }
+    },
+    {
+      "id": "safari-navigate",
+      "name": "Safari Navigate",
+      "category": "navigation",
+      "goal": "Open Safari and navigate to apple.com",
+      "expected_outcome": "Safari shows apple.com",
+      "validation": {
+        "type": "url_match",
+        "pattern": "apple.com"
+      }
+    },
+    {
+      "id": "finder-new-folder",
+      "name": "Finder New Folder",
+      "category": "file_management",
+      "goal": "Open Finder and create a new folder",
+      "expected_outcome": "New folder created in current directory",
+      "validation": {
+        "type": "file_exists",
+        "pattern": "untitled folder"
+      }
+    },
+    {
+      "id": "edge-bookmark",
+      "name": "Edge Add Bookmark",
+      "category": "bookmarks",
+      "goal": "Open Edge, go to github.com, and bookmark the page",
+      "expected_outcome": "GitHub page bookmarked",
+      "validation": {
+        "type": "bookmark_exists",
+        "url": "github.com"
+      }
+    },
+    {
+      "id": "edge-history",
+      "name": "Edge View History",
+      "category": "history",
+      "goal": "Open Edge and view browsing history",
+      "expected_outcome": "History panel visible",
+      "validation": {
+        "type": "ui_element",
+        "element": "history_panel"
+      }
+    },
+    {
+      "id": "terminal-command",
+      "name": "Terminal Command",
+      "category": "terminal",
+      "goal": "Open Terminal and run 'echo hello'",
+      "expected_outcome": "Terminal shows 'hello' output",
+      "validation": {
+        "type": "text_visible",
+        "text": "hello"
+      }
+    }
+  ]
+}
