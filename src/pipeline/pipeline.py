@@ -96,8 +96,8 @@ class Pipeline:
         # Initialize components
         self.goal_parser = GoalParser()
         self.plan_generator = PlanGenerator()
-        self.compiler = Compiler(self.base_dir / "registry")
-        self.executor = Executor(mac_cli=mac_cli)
+        self.compiler = Compiler(self.base_dir / "registry" / "actions.yaml")
+        self.executor = Executor()
         self.evidence_storage = EvidenceStorage(self.base_dir / "runs")
         self.evaluator = Evaluator()
         self.repair_loop = RepairLoop()
@@ -240,7 +240,7 @@ class Pipeline:
         """Stage 3: Compile plan."""
         start = datetime.utcnow()
         try:
-            compiled = self.compiler.compile(plan)
+            compiled = self.compiler.compile_plan(plan)
             duration = int((datetime.utcnow() - start).total_seconds() * 1000)
             
             # Check for validation errors
@@ -362,8 +362,8 @@ class Pipeline:
         self.mac_cli = mac_cli
         self.goal_parser = GoalParser()
         self.plan_generator = PlanGenerator()
-        self.compiler = Compiler(self.base_dir / "registry")
-        self.executor = Executor(mac_cli=mac_cli)
+        self.compiler = Compiler(self.base_dir / "registry" / "actions.yaml")
+        self.executor = Executor()
         self.evidence_storage = EvidenceStorage(self.base_dir / "runs")
         self.evaluator = Evaluator()
         self.repair_loop = RepairLoop()
@@ -437,7 +437,7 @@ class Pipeline:
     def _compile(self, plan: Dict[str, Any]) -> tuple:
         start = datetime.utcnow()
         try:
-            compiled = self.compiler.compile(plan)
+            compiled = self.compiler.compile_plan(plan)
             errors = [s for s in compiled.get("steps", []) if s.get("error")]
             if errors:
                 return StageResult(stage=PipelineStage.COMPILE, success=False, error=f"Compilation errors: {errors}", duration_ms=int((datetime.utcnow() - start).total_seconds() * 1000)), None

@@ -121,11 +121,22 @@ class PlanGenerator:
         step_id = f"s{num}"
         
         if action == "launch":
+            bundle_map = {
+                "Microsoft Edge": "com.microsoft.edgemac",
+                "Safari": "com.apple.Safari",
+                "Google Chrome": "com.google.Chrome",
+                "Firefox": "org.mozilla.firefox",
+                "Finder": "com.apple.finder",
+                "Terminal": "com.apple.Terminal",
+                "Notes": "com.apple.Notes",
+                "Mail": "com.apple.mail",
+            }
+            bundle_id = bundle_map.get(goal.target_app, goal.target_app)
             return PlanStep(
                 step_id=step_id,
                 action="launch_app",
                 target=goal.target_app,
-                params={"app_name": goal.target_app},
+                params={"bundle_id": bundle_id},
                 evidence=self.DEFAULT_EVIDENCE.get("launch", {}),
                 retry_policy=self.DEFAULT_RETRY.get("launch", {}),
                 on_fail="abort",
@@ -134,8 +145,8 @@ class PlanGenerator:
         elif action == "new_tab":
             return PlanStep(
                 step_id=step_id,
-                action="keyboard_shortcut",
-                params={"shortcut": "cmd+t"},
+                action="hotkey",
+                params={"keys": ["cmd", "t"]},
                 evidence=self.DEFAULT_EVIDENCE.get("new_tab", {}),
                 retry_policy=self.DEFAULT_RETRY.get("new_tab", {}),
                 on_fail="continue",

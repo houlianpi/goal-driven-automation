@@ -48,7 +48,7 @@ class Compiler:
             raise CompilerError(f"Unknown action: {action_name}")
         
         action_def = self.registry[action_name]
-        args = step.get("args", {})
+        args = step.get("args", step.get("params", {}))
         
         # Validate required args
         for arg_name, arg_spec in action_def.get("args", {}).items():
