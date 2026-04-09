@@ -1,0 +1,58 @@
+{
+  "evidence_id": "evidence-20260409-002",
+  "plan_id": "plan-safari-navigate",
+  "run_id": "run-e5f6g7h8",
+  "version": "1.0.0",
+  "status": "partial",
+  "started_at": "2026-04-09T14:10:00+08:00",
+  "finished_at": "2026-04-09T14:10:15+08:00",
+  "duration_ms": 15000,
+  "environment": {
+    "os": "macOS",
+    "os_version": "14.0",
+    "hostname": "test-mac",
+    "executor_version": "1.0.0"
+  },
+  "steps": [
+    {
+      "step_id": "s1",
+      "action": "launch",
+      "status": "success",
+      "duration_ms": 2000,
+      "cli_command": {
+        "command": ["osascript", "-e", "tell app \"Safari\" to activate"],
+        "exit_code": 0
+      }
+    },
+    {
+      "step_id": "s2",
+      "action": "shortcut",
+      "status": "repaired",
+      "duration_ms": 3000,
+      "cli_command": {
+        "command": ["mac", "input", "hotkey", "command", "l"],
+        "exit_code": 0
+      },
+      "error": {
+        "type": "SessionLost",
+        "message": "Appium session disconnected",
+        "classification": "environment_failure"
+      },
+      "retry_count": 1
+    }
+  ],
+  "repairs": [
+    {
+      "step_id": "s2",
+      "failure_type": "environment_failure",
+      "strategy": "restart_session",
+      "attempt_number": 1,
+      "success": true,
+      "details": "Restarted Appium session, retry successful"
+    }
+  ],
+  "artifacts": {
+    "screenshots_dir": "runs/run-e5f6g7h8/screenshots/",
+    "logs_dir": "runs/run-e5f6g7h8/logs/"
+  }
+}

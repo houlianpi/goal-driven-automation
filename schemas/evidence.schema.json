@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evidence Schema",
+  "description": "Execution results and evidence",
+  "version": "1.0.0",
+  "type": "object",
+  "required": ["evidence_id", "plan_id", "run_id", "status", "steps"],
+  "properties": {
+    "evidence_id": {
+      "type": "string",
+      "description": "Unique evidence identifier",
+      "pattern": "^evidence-[a-z0-9-]+$"
+    },
+    "plan_id": {
+      "type": "string",
+      "description": "Reference to executed plan"
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Unique run identifier"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failure", "aborted"],
+      "description": "Overall execution status"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "duration_ms": {
+      "type": "integer",
+      "description": "Total execution time in milliseconds"
+    },
+    "environment": {
+      "type": "object",
+      "properties": {
+        "os": {"type": "string"},
+        "os_version": {"type": "string"},
+        "hostname": {"type": "string"},
+        "executor_version": {"type": "string"}
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/step_result"}
+    },
+    "assertions": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/assertion_result"}
+    },
+    "repairs": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/repair_attempt"}
+    },
+    "artifacts": {
+      "type": "object",
+      "description": "Paths to artifact files",
+      "properties": {
+        "screenshots_dir": {"type": "string"},
+        "ui_trees_dir": {"type": "string"},
+        "logs_dir": {"type": "string"}
+      }
+    }
+  },
+  "definitions": {
+    "step_result": {
+      "type": "object",
+      "required": ["step_id", "action", "status"],
+      "properties": {
+        "step_id": {"type": "string"},
+        "action": {"type": "string"},
+        "status": {
+          "type": "string",
+          "enum": ["success", "failure", "skipped", "repaired"]
+        },
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"},
+        "duration_ms": {"type": "integer"},
+        "cli_command": {
+          "type": "object",
+          "properties": {
+            "command": {"type": "array", "items": {"type": "string"}},
+            "exit_code": {"type": "integer"},
+            "stdout": {"type": "string"},
+            "stderr": {"type": "string"}
+          }
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "type": {"type": "string"},
+            "message": {"type": "string"},
+            "classification": {
+              "type": "string",
+              "enum": [
+                "plan_invalid",
+                "precondition_missing",
+                "capability_unavailable",
+                "environment_failure",
+                "observation_insufficient",
+                "assertion_failed"
+              ]
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "properties": {
+            "screenshot_before": {"type": "string", "description": "Path or base64"},
+            "screenshot_after": {"type": "string"},
+            "ui_tree_before": {"type": "string"},
+            "ui_tree_after": {"type": "string"}
+          }
+        },
+        "retry_count": {"type": "integer", "default": 0}
+      }
+    },
+    "assertion_result": {
+      "type": "object",
+      "required": ["assertion_id", "passed"],
+      "properties": {
+        "assertion_id": {"type": "string"},
+        "step_id": {"type": "string"},
+        "condition": {"type": "string"},
+        "passed": {"type": "boolean"},
+        "actual_value": {"type": "string"},
+        "expected_value": {"type": "string"},
+        "review_required": {"type": "boolean"}
+      }
+    },
+    "repair_attempt": {
+      "type": "object",
+      "required": ["step_id", "strategy", "success"],
+      "properties": {
+        "step_id": {"type": "string"},
+        "failure_type": {"type": "string"},
+        "strategy": {
+          "type": "string",
+          "enum": ["retry", "restart_session", "replan_step", "skip", "human_review"]
+        },
+        "attempt_number": {"type": "integer"},
+        "success": {"type": "boolean"},
+        "details": {"type": "string"}
+      }
+    }
+  }
+}

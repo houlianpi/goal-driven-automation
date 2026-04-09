@@ -1,0 +1,35 @@
+{
+  "plan_id": "plan-edge-new-tab",
+  "version": "1.0.0",
+  "goal": "Test Edge new tab creation",
+  "app": "Microsoft Edge",
+  "created_at": "2026-04-09T14:00:00+08:00",
+  "steps": [
+    {
+      "step_id": "step-1-launch",
+      "action": "launch",
+      "params": {"app": "Microsoft Edge"},
+      "expected_signal": "app_active",
+      "retry_policy": {"max_attempts": 2}
+    },
+    {
+      "step_id": "step-2-capture-baseline",
+      "action": "capture",
+      "params": {"type": "ui_tree"},
+      "expected_signal": "captured"
+    },
+    {
+      "step_id": "step-3-new-tab",
+      "action": "shortcut",
+      "params": {"keys": ["command", "t"]},
+      "expected_signal": "tab_count_increased",
+      "evidence": {"screenshot_before": true, "screenshot_after": true}
+    },
+    {
+      "step_id": "step-4-verify",
+      "action": "assert",
+      "params": {"condition": "tab_count > baseline.tab_count"},
+      "review_required": true
+    }
+  ]
+}

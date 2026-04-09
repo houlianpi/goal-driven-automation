@@ -1,0 +1,58 @@
+{
+  "evidence_id": "evidence-20260409-001",
+  "plan_id": "plan-edge-new-tab",
+  "run_id": "run-a1b2c3d4",
+  "version": "1.0.0",
+  "status": "success",
+  "started_at": "2026-04-09T14:00:00+08:00",
+  "finished_at": "2026-04-09T14:00:05+08:00",
+  "duration_ms": 5000,
+  "environment": {
+    "os": "macOS",
+    "os_version": "14.0",
+    "hostname": "test-mac",
+    "executor_version": "1.0.0"
+  },
+  "steps": [
+    {
+      "step_id": "step-1-launch",
+      "action": "launch",
+      "status": "success",
+      "duration_ms": 2000,
+      "cli_command": {
+        "command": ["osascript", "-e", "tell app \"Microsoft Edge\" to activate"],
+        "exit_code": 0,
+        "stdout": ""
+      }
+    },
+    {
+      "step_id": "step-3-new-tab",
+      "action": "shortcut",
+      "status": "success",
+      "duration_ms": 500,
+      "cli_command": {
+        "command": ["mac", "input", "hotkey", "command", "t"],
+        "exit_code": 0
+      },
+      "evidence": {
+        "screenshot_before": "runs/run-a1b2c3d4/screenshots/step-3-before.png",
+        "screenshot_after": "runs/run-a1b2c3d4/screenshots/step-3-after.png"
+      }
+    }
+  ],
+  "assertions": [
+    {
+      "assertion_id": "assert-tab-count",
+      "step_id": "step-4-verify",
+      "condition": "tab_count > baseline.tab_count",
+      "passed": true,
+      "actual_value": "2",
+      "expected_value": ">1"
+    }
+  ],
+  "artifacts": {
+    "screenshots_dir": "runs/run-a1b2c3d4/screenshots/",
+    "ui_trees_dir": "runs/run-a1b2c3d4/ui_trees/",
+    "logs_dir": "runs/run-a1b2c3d4/logs/"
+  }
+}
