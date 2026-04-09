@@ -1,0 +1,36 @@
+# Goal Schema v1.0
+# Human-defined objectives for automation
+
+schema_version: "1.0"
+
+goal:
+  id: string           # Unique identifier
+  name: string         # Human-readable name
+  description: string  # What this goal aims to achieve
+  
+  # Target application
+  target:
+    application: string  # e.g., "Microsoft Edge", "Safari"
+    version: string      # Optional version constraint
+  
+  # What should be achieved
+  objectives:
+    - action: string     # What to do
+      expected: string   # What we expect to see
+  
+  # Constraints
+  constraints:
+    - type: string       # e.g., "no_user_data_modification"
+      description: string
+  
+  # Acceptance criteria
+  acceptance:
+    - condition: string
+      priority: string   # "required" | "preferred"
+  
+  # Review points
+  review_required:
+    - step: string
+      reason: string
+
+# Example in goals/examples/edge_tab.yaml

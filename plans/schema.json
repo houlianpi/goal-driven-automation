@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Plan IR Schema",
+  "description": "Intermediate Representation for execution plans",
+  "version": "1.0",
+  "type": "object",
+  "required": ["plan_id", "plan_version", "goal_id", "steps"],
+  "properties": {
+    "plan_id": {
+      "type": "string",
+      "description": "Unique plan identifier"
+    },
+    "plan_version": {
+      "type": "string",
+      "description": "Schema version"
+    },
+    "goal_id": {
+      "type": "string",
+      "description": "Reference to goal"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/step"
+      }
+    }
+  },
+  "definitions": {
+    "step": {
+      "type": "object",
+      "required": ["step_id", "action", "args"],
+      "properties": {
+        "step_id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "description": "Action name from registry"
+        },
+        "args": {
+          "type": "object",
+          "description": "Action arguments"
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "expected_signal": {
+          "type": "string",
+          "description": "What indicates success"
+        },
+        "retry_policy": {
+          "$ref": "#/definitions/retry_policy"
+        },
+        "on_fail": {
+          "type": "string",
+          "enum": ["abort", "skip", "replan", "human_review"]
+        },
+        "review_required": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "retry_policy": {
+      "type": "object",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "default": 3
+        },
+        "backoff": {
+          "type": "string",
+          "enum": ["none", "linear", "exponential"]
+        },
+        "delay_ms": {
+          "type": "integer",
+          "default": 1000
+        }
+      }
+    }
+  }
+}

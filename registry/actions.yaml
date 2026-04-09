@@ -1,0 +1,55 @@
+# Capability Registry - Actions
+# All supported actions that Plan IR can reference
+
+schema_version: "1.0"
+
+actions:
+  # Application control
+  activate_app:
+    description: Activate/focus an application
+    args:
+      app_name: {type: string, required: true}
+    compile_to: osascript -e 'tell application "{app_name}" to activate'
+    expected_evidence: [process_running]
+    default_retry: {max: 3, backoff: linear}
+  
+  # Keyboard actions
+  hotkey:
+    description: Send keyboard hotkey
+    args:
+      keys: {type: array, required: true}
+    compile_to: mac input hotkey {keys}
+    expected_evidence: [command_output]
+    default_retry: {max: 2, backoff: none}
+  
+  type_text:
+    description: Type text
+    args:
+      text: {type: string, required: true}
+    compile_to: mac input type "{text}"
+    expected_evidence: [command_output]
+    default_retry: {max: 2, backoff: none}
+  
+  # Session management
+  session_start:
+    description: Start fsq-mac session
+    args: {}
+    compile_to: mac session start
+    expected_evidence: [session_id]
+    default_retry: {max: 3, backoff: exponential}
+  
+  session_end:
+    description: End fsq-mac session
+    args: {}
+    compile_to: mac session end
+    expected_evidence: [command_output]
+    default_retry: {max: 1, backoff: none}
+  
+  # Wait/delay
+  wait:
+    description: Wait for specified time
+    args:
+      ms: {type: integer, required: true}
+    compile_to: sleep {ms}ms
+    expected_evidence: []
+    default_retry: {max: 1, backoff: none}

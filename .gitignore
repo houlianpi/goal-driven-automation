@@ -1,11 +1,14 @@
-# Runs directory (local execution artifacts)
-runs/
+# Runs (execution records)
+runs/*
+!runs/.gitkeep
 
 # Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
 .venv/
 venv/
+.env
 
 # IDE
 .idea/
@@ -14,3 +17,7 @@ venv/
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Test artifacts
+*.log
