@@ -1,0 +1,45 @@
+# Capability Registry Schema v1.0
+# Defines the structure for action registration
+
+schema_version: "1.0"
+
+action_schema:
+  required_fields:
+    - description      # Human-readable description
+    - args             # Argument schema
+    - compile_to       # fsq-mac CLI command template
+    - expected_evidence # What evidence to collect
+    - default_retry    # Retry policy
+
+  optional_fields:
+    - preconditions    # Required state before execution
+    - postconditions   # Expected state after execution
+    - repair_hints     # Suggestions for failure recovery
+    - tags             # Categorization tags
+    - danger_level     # safe | warning | dangerous
+
+  arg_types:
+    - string
+    - integer
+    - boolean
+    - array
+    - object
+
+  evidence_types:
+    - command_output   # CLI stdout/stderr
+    - screenshot       # Screen capture
+    - ui_tree          # Accessibility tree
+    - session_id       # Session identifier
+    - process_running  # Process check
+    - element_found    # Element located
+    - assertion_result # Assert pass/fail
+
+  retry_backoff:
+    - none
+    - linear
+    - exponential
+
+  danger_levels:
+    safe: "No side effects, safe to retry"
+    warning: "May modify state, confirm before retry"
+    dangerous: "Irreversible action, requires --allow-dangerous"
