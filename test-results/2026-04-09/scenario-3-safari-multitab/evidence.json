@@ -1,0 +1,31 @@
+{
+  "scenario_id": "scenario-3-safari-multitab",
+  "name": "Safari Multi-Tab Management",
+  "status": "PASS",
+  "started_at": "2026-04-09T16:17:07+08:00",
+  "finished_at": "2026-04-09T16:17:34+08:00",
+  "duration_ms": 27000,
+  "steps": [
+    {"step": 1, "action": "app.launch", "target": "com.apple.Safari", "status": "success"},
+    {"step": 2, "action": "input.hotkey", "target": "command+l", "status": "success"},
+    {"step": 3, "action": "input.text", "target": "apple.com", "status": "success"},
+    {"step": 4, "action": "input.hotkey", "target": "return", "status": "success"},
+    {"step": 5, "action": "input.hotkey", "target": "command+t", "status": "success"},
+    {"step": 6, "action": "input.text", "target": "google.com", "status": "success"},
+    {"step": 7, "action": "input.hotkey", "target": "return", "status": "success"},
+    {"step": 8, "action": "input.hotkey", "target": "command+t", "status": "success"},
+    {"step": 9, "action": "input.text", "target": "github.com", "status": "success"},
+    {"step": 10, "action": "input.hotkey", "target": "return", "status": "success"},
+    {"step": 11, "action": "capture.screenshot", "status": "success"}
+  ],
+  "verification": {
+    "method": "window_title",
+    "expected": "contains 'GitHub'",
+    "actual": "GitHub · Change is constant. GitHub keeps you ahead. · GitHub",
+    "passed": true
+  },
+  "artifacts": {
+    "screenshots": ["screenshots/final.png"],
+    "logs": ["logs/execution.log"]
+  }
+}

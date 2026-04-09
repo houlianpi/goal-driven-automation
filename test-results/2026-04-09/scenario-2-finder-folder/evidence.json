@@ -1,0 +1,27 @@
+{
+  "scenario_id": "scenario-2-finder-folder",
+  "name": "Finder Create Folder",
+  "status": "PASS",
+  "started_at": "2026-04-09T16:16:39+08:00",
+  "finished_at": "2026-04-09T16:16:53+08:00",
+  "duration_ms": 14000,
+  "steps": [
+    {"step": 1, "action": "app.launch", "target": "com.apple.finder", "status": "success"},
+    {"step": 2, "action": "input.hotkey", "target": "command+shift+d", "status": "success"},
+    {"step": 3, "action": "input.hotkey", "target": "command+shift+n", "status": "success"},
+    {"step": 4, "action": "input.text", "target": "TestFolder_E2E", "status": "success"},
+    {"step": 5, "action": "input.key", "target": "return", "status": "success"},
+    {"step": 6, "action": "capture.screenshot", "status": "success"}
+  ],
+  "verification": {
+    "method": "shell_command",
+    "command": "ls ~/Desktop | grep TestFolder_E2E",
+    "expected": "TestFolder_E2E",
+    "actual": "TestFolder_E2E",
+    "passed": true
+  },
+  "artifacts": {
+    "screenshots": ["screenshots/final.png"],
+    "logs": ["logs/execution.log"]
+  }
+}

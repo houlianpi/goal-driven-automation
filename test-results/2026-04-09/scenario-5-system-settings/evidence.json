@@ -1,0 +1,25 @@
+{
+  "scenario_id": "scenario-5-system-settings",
+  "name": "System Settings Wi-Fi Check",
+  "status": "PASS",
+  "started_at": "2026-04-09T16:18:09+08:00",
+  "finished_at": "2026-04-09T16:18:24+08:00",
+  "duration_ms": 15000,
+  "steps": [
+    {"step": 1, "action": "app.launch", "target": "com.apple.systempreferences", "status": "success"},
+    {"step": 2, "action": "input.hotkey", "target": "command+f", "status": "success"},
+    {"step": 3, "action": "input.text", "target": "Wi-Fi", "status": "success"},
+    {"step": 4, "action": "input.hotkey", "target": "return", "status": "success"},
+    {"step": 5, "action": "capture.screenshot", "status": "success"}
+  ],
+  "verification": {
+    "method": "screenshot",
+    "expected": "System Settings panel visible",
+    "actual": "Settings panel opened",
+    "passed": true
+  },
+  "artifacts": {
+    "screenshots": ["screenshots/final.png"],
+    "logs": ["logs/execution.log"]
+  }
+}

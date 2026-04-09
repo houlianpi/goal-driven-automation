@@ -1,0 +1,26 @@
+{
+  "scenario_id": "scenario-1-edge-navigate",
+  "name": "Edge Navigate to GitHub",
+  "status": "PASS",
+  "started_at": "2026-04-09T16:15:49+08:00",
+  "finished_at": "2026-04-09T16:16:20+08:00",
+  "duration_ms": 31000,
+  "steps": [
+    {"step": 1, "action": "app.launch", "target": "com.microsoft.edgemac", "status": "success"},
+    {"step": 2, "action": "input.hotkey", "target": "command+t", "status": "success"},
+    {"step": 3, "action": "input.hotkey", "target": "command+l", "status": "success"},
+    {"step": 4, "action": "input.text", "target": "github.com", "status": "success"},
+    {"step": 5, "action": "input.hotkey", "target": "return", "status": "success"},
+    {"step": 6, "action": "capture.screenshot", "status": "success"}
+  ],
+  "verification": {
+    "method": "window_title",
+    "expected": "contains 'GitHub'",
+    "actual": "GitHub · Change is constant. GitHub keeps you ahead. · GitHub - Microsoft Edge",
+    "passed": true
+  },
+  "artifacts": {
+    "screenshots": ["screenshots/final.png"],
+    "logs": ["logs/execution.log"]
+  }
+}
