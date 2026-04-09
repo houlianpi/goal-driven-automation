@@ -1,0 +1,8 @@
+=== Scenario 4: Notes Quick Note ===
+Started: Thu Apr  9 16:17:44 CST 2026
+{"ok": true, "command": "app.launch", "session_id": "s3", "data": {"name": "Notes", "bundle_id": "com.apple.Notes"}, "error": null, "meta": {"backend": "appium_mac2", "duration_ms": 2883, "timestamp": "2026-04-09T08:17:48Z", "frontmost_app": "com.apple.Notes", "frontmost_window": "备忘录"}}
+{"ok": true, "command": "input.hotkey", "session_id": "s3", "data": null, "error": null, "meta": {"backend": "appium_mac2", "duration_ms": 120, "timestamp": "2026-04-09T08:17:51Z", "frontmost_app": "com.apple.Notes", "frontmost_window": "备忘录"}}
+{"ok": true, "command": "input.text", "session_id": "s3", "data": null, "error": null, "meta": {"backend": "appium_mac2", "duration_ms": 3234, "timestamp": "2026-04-09T08:17:56Z", "frontmost_app": "com.apple.Notes", "frontmost_window": "备忘录"}}
+{"ok": true, "command": "capture.screenshot", "session_id": "s3", "data": {"path": "/tmp/e2e_results/scenario_4/screenshot.png", "size_bytes": 3347074}, "error": null, "meta": {"backend": "appium_mac2", "duration_ms": 256, "timestamp": "2026-04-09T08:17:58Z", "frontmost_app": "com.apple.Notes", "frontmost_window": "备忘录"}}
+{"ok": true, "command": "window.current", "session_id": "s3", "data": {"app_name": "Notes", "app_bundle_id": "com.apple.Notes", "title": "备忘录", "x": 780, "y": 375, "width": 1000, "height": 660}, "error": null, "meta": {"backend": "appium_mac2", "duration_ms": 282, "timestamp": "2026-04-09T08:17:59Z", "frontmost_app": "com.apple.Notes", "frontmost_window": "备忘录"}}
+Finished: Thu Apr  9 16:17:59 CST 2026
