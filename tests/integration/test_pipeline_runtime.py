@@ -22,8 +22,8 @@ actions:
     default_retry: {max: 1}
   hotkey:
     args:
-      keys: {type: array, required: true}
-    compile_to: mac input hotkey {keys}
+      combo: {type: string, required: true}
+    compile_to: mac input hotkey {combo}
     expected_evidence: [command_output]
     default_retry: {max: 1}
   assert_visible:
@@ -69,6 +69,9 @@ def test_pipeline_runtime_persists_and_evaluates_successful_execution():
         assert loaded.plan_id == result.plan["plan_id"]
         assert loaded.status.value == "success"
         assert len(loaded.steps) == len(result.evidence.steps)
+        assert result.to_dict()["run_summary"]["run_id"] == result.run_id
+        assert result.to_dict()["run_summary"]["final_status"] == result.final_status
+        assert result.to_dict()["run_summary"]["passed_steps"] == result.evaluation.passed_steps
 
 
 def test_pipeline_runtime_reaches_partial_without_failures_after_repair():

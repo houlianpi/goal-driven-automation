@@ -150,8 +150,8 @@ actions:
   hotkey:
     description: Send keyboard hotkey
     args:
-      keys: {type: array, required: true, description: "Key combination e.g. ['cmd', 't']"}
-    compile_to: mac input hotkey {keys}
+      combo: {type: string, required: true, description: "Key combination e.g. command+t"}
+    compile_to: mac input hotkey {combo}
     expected_evidence: [command_output]
     preconditions: [session_active, app_focused]
     default_retry: {max: 2, backoff: none}
@@ -162,7 +162,7 @@ actions:
     description: Type text directly (no element focus)
     args:
       text: {type: string, required: true}
-    compile_to: mac input type {text}
+    compile_to: mac input text {text}
     expected_evidence: [command_output]
     preconditions: [session_active]
     default_retry: {max: 2, backoff: none}
@@ -246,8 +246,8 @@ actions:
   wait:
     description: Wait for specified time
     args:
-      ms: {type: integer, required: true, description: "Milliseconds to wait"}
-    compile_to: sleep {ms}ms
+      seconds: {type: number, required: true, description: "Seconds to wait"}
+    compile_to: sleep {seconds}
     expected_evidence: []
     default_retry: {max: 1, backoff: none}
     danger_level: safe

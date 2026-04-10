@@ -103,6 +103,35 @@ class Executor:
         self.runs_dir = runs_dir
         self.timeout_ms = timeout_ms
         self.mac_cli = os.environ.get("FSQ_MAC_CLI", "mac")
+        self._session_bootstrapped = False
+
+    def _resolve_command(self, command: List[str]) -> List[str]:
+        """Resolve logical CLI placeholders to concrete executables."""
+        if command and command[0] == "mac":
+            return [self.mac_cli, *command[1:]]
+        return command
+
+    def _is_mac_command(self, command: List[str]) -> bool:
+        """Return True when the argv targets fsq-mac."""
+        if not command:
+            return False
+        return Path(command[0]).name == Path(self.mac_cli).name
+
+    def _requires_session(self, command: List[str]) -> bool:
+        """Return True when the fsq-mac command expects an active session."""
+        if not self._is_mac_command(command) or len(command) < 2:
+            return False
+        return command[1] not in {"session", "doctor"}
+
+    def _ensure_session_started(self) -> Optional[Dict[str, Any]]:
+        """Start a session once per plan before session-bound commands."""
+        if self._session_bootstrapped:
+            return None
+
+        result = self.execute_command([self.mac_cli, "session", "start"], timeout_ms=30000)
+        if result["return_code"] == 0:
+            self._session_bootstrapped = True
+        return result
     
     def execute_command(self, command: List[str], timeout_ms: Optional[int] = None) -> Dict[str, Any]:
         """
@@ -111,6 +140,7 @@ class Executor:
         Returns:
             Dict with stdout, stderr, return_code, duration_ms
         """
+        command = self._resolve_command(command)
         timeout = (timeout_ms or self.timeout_ms) / 1000.0
         start = time.time()
         
@@ -158,7 +188,7 @@ class Executor:
         """
         step_id = step.get("step_id", "unknown")
         command = step.get("command")
-        argv = step.get("argv")
+        argv = self._resolve_command(step.get("argv") or [])
 
         if not command or not argv:
             return StepResult(
@@ -168,6 +198,21 @@ class Executor:
                 argv=argv or [],
                 error="Step missing 'command' or 'argv' field - not compiled?",
             )
+
+        if self._requires_session(argv):
+            session_result = self._ensure_session_started()
+            if session_result and session_result["return_code"] != 0:
+                return StepResult(
+                    step_id=step_id,
+                    success=False,
+                    command=command,
+                    argv=argv,
+                    stdout=session_result.get("stdout", ""),
+                    stderr=session_result.get("stderr", ""),
+                    return_code=session_result.get("return_code", -1),
+                    duration_ms=session_result.get("duration_ms", 0),
+                    error="Failed to bootstrap fsq-mac session",
+                )
         
         # Execute with retry
         retry_policy = step.get("retry_policy", {})
@@ -179,6 +224,12 @@ class Executor:
         for attempt in range(max_attempts):
             result = self.execute_command(argv)
             last_result = result
+
+            if len(argv) >= 3 and argv[1] == "session":
+                if argv[2] == "start" and result["return_code"] == 0:
+                    self._session_bootstrapped = True
+                elif argv[2] == "end" and result["return_code"] == 0:
+                    self._session_bootstrapped = False
             
             if result["return_code"] == 0:
                 return StepResult(
@@ -229,7 +280,8 @@ class Executor:
         """
         plan_id = plan.get("plan_id", "unknown")
         run_id = str(uuid.uuid4())[:8]
-        
+        self._session_bootstrapped = False
+
         result = PlanResult(plan_id, run_id)
         
         for step in plan.get("steps", []):

@@ -1,4 +1,5 @@
 """Unit tests for Executor."""
+import os
 import pytest
 from unittest.mock import patch, MagicMock
 from src.evidence.types import RunEvidence, RunStatus
@@ -119,6 +120,52 @@ class TestExecutor:
         assert result.plan_id == "test_plan"
         assert result.status == RunStatus.SUCCESS
         assert len(result.steps) == 2
+
+    @patch.dict(os.environ, {"FSQ_MAC_CLI": "/tmp/fake-mac"}, clear=False)
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_step_rewrites_mac_argv_to_configured_cli(self, mock_run):
+        """Test executor resolves logical mac argv to FSQ_MAC_CLI."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+
+        executor = Executor()
+        step = {
+            "step_id": "s-cli",
+            "command": "mac app launch com.apple.Safari",
+            "argv": ["mac", "app", "launch", "com.apple.Safari"],
+            "retry_policy": {"max": 1},
+        }
+
+        result = executor.execute_step(step)
+
+        assert result.success is True
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        assert calls[0] == ["/tmp/fake-mac", "session", "start"]
+        assert calls[1] == ["/tmp/fake-mac", "app", "launch", "com.apple.Safari"]
+
+    @patch.dict(os.environ, {"FSQ_MAC_CLI": "/tmp/fake-mac"}, clear=False)
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_plan_bootstraps_session_once_for_multiple_mac_steps(self, mock_run):
+        """Test session bootstrap runs once per plan for session-bound fsq-mac commands."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
+
+        executor = Executor()
+        plan = {
+            "plan_id": "plan-session",
+            "steps": [
+                {"step_id": "s1", "command": "mac app launch com.apple.Safari", "argv": ["mac", "app", "launch", "com.apple.Safari"]},
+                {"step_id": "s2", "command": "mac input hotkey command+t", "argv": ["mac", "input", "hotkey", "command+t"]},
+            ],
+        }
+
+        result = executor.execute_plan(plan)
+
+        assert result.success is True
+        calls = [call.args[0] for call in mock_run.call_args_list]
+        assert calls == [
+            ["/tmp/fake-mac", "session", "start"],
+            ["/tmp/fake-mac", "app", "launch", "com.apple.Safari"],
+            ["/tmp/fake-mac", "input", "hotkey", "command+t"],
+        ]
 
 
 class TestStepResult:

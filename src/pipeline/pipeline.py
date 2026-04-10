@@ -54,6 +54,30 @@ class PipelineResult:
     success: bool = False
     final_status: str = "unknown"
     artifacts_dir: Optional[str] = None
+
+    def run_summary(self) -> Dict[str, Any]:
+        """Stable agent-facing summary for one pipeline run."""
+        if self.evaluation:
+            passed_steps = self.evaluation.passed_steps
+            failed_steps = self.evaluation.failed_steps
+            partial_steps = self.evaluation.partial_steps
+        elif self.evidence:
+            passed_steps = sum(1 for step in self.evidence.steps if step.status.value in {"success", "repaired"})
+            failed_steps = sum(1 for step in self.evidence.steps if step.status.value == "failure")
+            partial_steps = sum(1 for step in self.evidence.steps if step.status.value == "skipped")
+        else:
+            passed_steps = 0
+            failed_steps = 0
+            partial_steps = 0
+        return {
+            "run_id": self.run_id,
+            "final_status": self.final_status,
+            "success": self.success,
+            "passed_steps": passed_steps,
+            "failed_steps": failed_steps,
+            "partial_steps": partial_steps,
+            "artifact_dir": self.artifacts_dir,
+        }
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,6 +87,7 @@ class PipelineResult:
             "success": self.success,
             "final_status": self.final_status,
             "artifacts_dir": self.artifacts_dir,
+            "run_summary": self.run_summary(),
             "stages": [
                 {
                     "stage": s.stage.value,

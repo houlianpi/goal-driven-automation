@@ -240,3 +240,39 @@ actions:
             assert result.evidence is not None
             assert result.evidence.plan_id == result.plan["plan_id"]
             assert result.final_status in {"success", "partial", "failed", "recovered"}
+
+    def test_run_result_exposes_agent_summary_fields(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            registry_dir = Path(tmpdir) / "registry"
+            registry_dir.mkdir()
+            (registry_dir / "actions.yaml").write_text(
+                """
+schema_version: "1.0"
+actions:
+  launch_app:
+    args:
+      bundle_id: {type: string, required: true}
+    compile_to: mac app launch {bundle_id}
+    expected_evidence: [process_running]
+    default_retry: {max: 1}
+  assert_visible:
+    args:
+      locator: {type: string, required: true}
+      strategy: {type: string, required: false, default: accessibility_id}
+    compile_to: mac assert visible {locator} --strategy {strategy}
+    expected_evidence: [assertion_result]
+    default_retry: {max: 1}
+"""
+            )
+
+            pipeline = Pipeline(base_dir=Path(tmpdir))
+            pipeline.executor = MockExecutor(runs_dir=Path(tmpdir) / "data" / "runs", failure_rate=0.0)
+
+            result = pipeline.run("Open Edge")
+            payload = result.to_dict()
+
+            assert payload["run_summary"]["run_id"] == result.run_id
+            assert payload["run_summary"]["final_status"] == result.final_status
+            assert payload["run_summary"]["artifact_dir"] == result.artifacts_dir
+            assert payload["run_summary"]["passed_steps"] >= 1
+            assert payload["run_summary"]["failed_steps"] == 0

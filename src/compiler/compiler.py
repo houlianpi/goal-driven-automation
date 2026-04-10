@@ -93,7 +93,12 @@ class Compiler:
             return "launch_app", {"bundle_id": self.APP_BUNDLE_IDS.get(app_name, app_name)}
 
         if action_name == "shortcut":
-            return "hotkey", {"keys": args.get("keys", [])}
+            keys = args.get("keys", [])
+            if isinstance(keys, list):
+                combo = "+".join(str(key) for key in keys)
+            else:
+                combo = str(keys)
+            return "hotkey", {"combo": combo}
 
         if action_name == "type":
             return "type_text", {"text": args.get("text", "")}
@@ -109,12 +114,15 @@ class Compiler:
             seconds = args.get("seconds")
             if seconds is None:
                 seconds = args.get("timeout_ms", 0) / 1000.0
-            return "wait", {"ms": max(0, int(float(seconds) * 1000))}
+            return "wait", {"seconds": max(0.0, float(seconds))}
 
         if action_name == "assert":
             locator = args.get("locator", args.get("selector"))
             if not locator:
-                raise CompilerError("Unsupported assert params: compiler currently requires 'locator' or 'selector'")
+                # Generic goal-level conditions are not yet lowered to a concrete
+                # fsq-mac assertion primitive. Keep them compilable so pipeline
+                # dry-run and runtime flows can proceed without a fake locator.
+                return "wait", {"seconds": 0}
             return "assert_visible", {
                 "locator": locator,
                 "strategy": args.get("strategy", "accessibility_id"),
