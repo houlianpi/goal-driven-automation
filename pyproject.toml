@@ -27,6 +27,7 @@ testpaths = ["tests"]
 [tool.setuptools]
 packages = [
   "src",
+  "src.assets",
   "src.compiler",
   "src.evaluator",
   "src.evidence",
