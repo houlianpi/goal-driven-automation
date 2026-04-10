@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Test Suite",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "cases"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^suite-[a-z0-9-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "cases": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^case-[a-z0-9-]+$"},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "tags": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "include_tags": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        }
+      }
+    },
+    "enabled": {"type": "boolean", "default": true}
+  }
+}

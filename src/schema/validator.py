@@ -55,6 +55,11 @@ class SchemaValidator:
             errors.append(f"{path}: {error.message}")
         
         return len(errors) == 0, errors
+
+    def validate_document(self, data: Dict[str, Any], schema_name: str) -> Tuple[bool, List[str]]:
+        """Validate an arbitrary document against a named schema."""
+        normalized_name = schema_name.removesuffix(".schema.json")
+        return self.validate(data, normalized_name)
     
     def validate_or_raise(self, data: Dict[str, Any], schema_name: str) -> None:
         """Validate data and raise exception if invalid."""

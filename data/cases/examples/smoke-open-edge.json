@@ -1,0 +1,9 @@
+{
+  "id": "case-open-edge",
+  "title": "Open Edge",
+  "goal": "Open Edge",
+  "tags": ["smoke", "edge"],
+  "apps": ["Microsoft Edge"],
+  "priority": "high",
+  "enabled": true
+}

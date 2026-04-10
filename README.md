@@ -2,6 +2,16 @@
 
 AI Agent 驱动的 macOS 自动化测试框架。
 
+## 产品定位
+
+这个仓库是面向 coding agent 的自动化执行内核，不是主要面向终端用户的独立测试产品。
+
+- 上层 coding agent 负责用户对话、LLM 选择、提示词和上下文管理。
+- 本仓库负责目标解析、计划生成、命令编译、执行、证据收集、评估和修复。
+- 对非技术用户，上层 agent 应该暴露的对象是 `case`、`suite` 和 `run result`，而不是仓库内部目录结构。
+
+更完整的边界说明见 [docs/product/agent-first-positioning.md](/Users/qunmi/Documents/github/goal-driven-automation/docs/product/agent-first-positioning.md)。
+
 ## 环境要求
 
 - Python `3.13+`

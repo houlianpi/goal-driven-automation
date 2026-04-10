@@ -1,0 +1,7 @@
+{
+  "id": "suite-smoke-core",
+  "title": "Core smoke",
+  "cases": ["case-open-edge"],
+  "tags": ["smoke"],
+  "enabled": true
+}
