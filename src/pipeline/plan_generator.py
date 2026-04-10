@@ -19,6 +19,8 @@ class PlanStep:
     evidence: Dict[str, bool] = None
     retry_policy: Dict[str, Any] = None
     on_fail: str = "abort"
+    review_required: bool = False
+    metadata: Dict[str, Any] = None
     
     def to_dict(self) -> Dict[str, Any]:
         data = {
@@ -28,9 +30,12 @@ class PlanStep:
             "evidence": self.evidence or {},
             "retry_policy": self.retry_policy or {},
             "on_fail": self.on_fail,
+            "review_required": self.review_required,
         }
         if self.target is not None:
             data["target"] = self.target
+        if self.metadata:
+            data["metadata"] = self.metadata
         return data
 
 
@@ -150,24 +155,46 @@ class PlanGenerator:
             )
 
         elif action == "click":
+            params = {"selector": goal.constraints.get("element", "")}
+            if goal.constraints.get("app"):
+                params["app"] = goal.constraints["app"]
+            if goal.constraints.get("locator_text"):
+                params["locator_text"] = goal.constraints["locator_text"]
+            if goal.constraints.get("locator_role"):
+                params["locator_role"] = goal.constraints["locator_role"]
+
+            confidence = "medium" if goal.constraints.get("app") else "low"
             return PlanStep(
                 step_id=step_id,
                 action="click",
                 target=goal.constraints.get("element", "element"),
-                params={"selector": goal.constraints.get("element", "")},
+                params=params,
                 evidence=self.DEFAULT_EVIDENCE.get("click", {}),
                 retry_policy=self.DEFAULT_RETRY.get("click", {}),
-                on_fail="replan",
+                on_fail="replan" if confidence != "low" else "human_review",
+                review_required=confidence == "low",
+                metadata={"context_confidence": confidence},
             )
         
         elif action == "type":
+            params = {"text": goal.constraints.get("text", "")}
+            if goal.constraints.get("app"):
+                params["app"] = goal.constraints["app"]
+            if goal.constraints.get("requires_focused_target") is not None:
+                params["requires_focused_target"] = goal.constraints["requires_focused_target"]
+            if goal.constraints.get("input_target"):
+                params["input_target"] = goal.constraints["input_target"]
+
+            confidence = "medium" if goal.constraints.get("app") else "low"
             return PlanStep(
                 step_id=step_id,
                 action="type",
-                params={"text": goal.constraints.get("text", "")},
+                params=params,
                 evidence=self.DEFAULT_EVIDENCE.get("type", {}),
                 retry_policy=self.DEFAULT_RETRY.get("type", {}),
-                on_fail="retry",
+                on_fail="retry" if confidence != "low" else "human_review",
+                review_required=confidence == "low",
+                metadata={"context_confidence": confidence},
             )
         
         elif action == "navigate":

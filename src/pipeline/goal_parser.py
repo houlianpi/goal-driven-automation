@@ -96,7 +96,14 @@ class GoalParser:
     
     def _is_composite(self, text: str) -> bool:
         """Check if goal contains multiple actions."""
-        return " and " in text or " then " in text or "," in text
+        if " and " in text or " then " in text:
+            return True
+        if "," not in text:
+            return False
+
+        parts = [part.strip() for part in text.split(",") if part.strip()]
+        action_parts = sum(1 for part in parts if self._infer_actions(part))
+        return action_parts > 1
     
     def _parse_app_launch(self, goal_id: str, text: str) -> Goal:
         """Parse app launch goal."""
@@ -112,26 +119,31 @@ class GoalParser:
     
     def _parse_ui_navigation(self, goal_id: str, text: str) -> Goal:
         """Parse UI navigation goal."""
-        element = self._extract_element(text)
+        app = self._extract_known_app(text)
+        constraints = self._build_click_constraints(text, default_app=app)
+        element = constraints.get("element", "element")
         return Goal(
             goal_id=goal_id,
             description=text,
             goal_type=GoalType.UI_NAVIGATION,
+            target_app=app,
             actions=["click"],
             expected_state=f"Clicked on {element}",
-            constraints={"element": element},
+            constraints=constraints,
         )
-    
+
     def _parse_data_entry(self, goal_id: str, text: str) -> Goal:
         """Parse data entry goal."""
-        data = self._extract_quoted(text)
+        app = self._extract_known_app(text)
+        constraints = self._build_type_constraints(text, default_app=app)
         return Goal(
             goal_id=goal_id,
             description=text,
             goal_type=GoalType.DATA_ENTRY,
+            target_app=app,
             actions=["type"],
             expected_state="Text entered",
-            constraints={"text": data},
+            constraints=constraints,
         )
     
     def _parse_verification(self, goal_id: str, text: str) -> Goal:
@@ -152,7 +164,8 @@ class GoalParser:
         
         actions = []
         app = None
-        
+        constraints: Dict[str, Any] = {}
+
         for part in parts:
             part = part.strip()
             if not part:
@@ -161,26 +174,32 @@ class GoalParser:
             lower = part.lower()
             if lower.startswith("open"):
                 actions.append("launch")
-                app = self._extract_app(part)
+                app = self._extract_known_app(part) or self._extract_app(part)
             elif "new tab" in lower:
                 actions.append("new_tab")
             elif "click" in lower:
                 actions.append("click")
+                constraints.update(self._build_click_constraints(part, default_app=app))
             elif "type" in lower:
                 actions.append("type")
+                constraints.update(self._build_type_constraints(part, default_app=app))
             elif "verify" in lower or "check" in lower:
                 actions.append("assert")
             elif "wait" in lower:
                 actions.append("wait")
             elif "navigate" in lower or "go to" in lower:
                 actions.append("navigate")
-        
+
+        if app and ("click" in actions or "type" in actions):
+            constraints.setdefault("app", app)
+
         return Goal(
             goal_id=goal_id,
             description=text,
             goal_type=GoalType.COMPOSITE,
             target_app=app,
             actions=actions or ["unknown"],
+            constraints=constraints,
         )
     
     def _parse_generic(self, goal_id: str, text: str) -> Goal:
@@ -194,17 +213,71 @@ class GoalParser:
     
     def _extract_app(self, text: str) -> str:
         """Extract app name from text."""
+        app = self._extract_known_app(text)
+        if app:
+            return app
+
+        # Try to extract from "Open [AppName]"
+        match = re.search(r'open\s+(\w+)', text, re.IGNORECASE)
+        if match:
+            return match.group(1).title()
+
+        return "Unknown"
+
+    def _extract_known_app(self, text: str) -> Optional[str]:
+        """Extract a known app name from text when present."""
         lower = text.lower()
         for pattern, app_name in self.APP_PATTERNS.items():
             if pattern in lower:
                 return app_name
-        
-        # Try to extract from "Open [AppName]"
-        match = re.search(r'open\s+(\w+)', lower)
-        if match:
-            return match.group(1).title()
-        
-        return "Unknown"
+        return None
+
+    def _infer_actions(self, text: str) -> List[str]:
+        """Infer semantic actions present in a text fragment."""
+        lower = text.lower()
+        actions = []
+        if lower.startswith("open"):
+            actions.append("launch")
+        if "new tab" in lower:
+            actions.append("new_tab")
+        if "click" in lower or "tap" in lower:
+            actions.append("click")
+        if "type" in lower or "enter" in lower or "input" in lower:
+            actions.append("type")
+        if "verify" in lower or "check" in lower or "assert" in lower:
+            actions.append("assert")
+        if "wait" in lower:
+            actions.append("wait")
+        if "navigate" in lower or "go to" in lower:
+            actions.append("navigate")
+        return actions
+
+    def _build_click_constraints(self, text: str, default_app: Optional[str] = None) -> Dict[str, Any]:
+        """Build click constraints with explicit locator and app context."""
+        app = self._extract_known_app(text) or default_app
+        element = self._extract_element(text)
+        locator_text = self._extract_locator_text(text, fallback=element)
+        locator_role = self._extract_locator_role(text)
+
+        constraints: Dict[str, Any] = {"element": element}
+        if app:
+            constraints["app"] = app
+        if locator_text:
+            constraints["locator_text"] = locator_text
+        if locator_role:
+            constraints["locator_role"] = locator_role
+        return constraints
+
+    def _build_type_constraints(self, text: str, default_app: Optional[str] = None) -> Dict[str, Any]:
+        """Build type constraints with explicit context metadata."""
+        app = self._extract_known_app(text) or default_app
+        constraints: Dict[str, Any] = {
+            "text": self._extract_quoted(text),
+            "requires_focused_target": True,
+        }
+        if app:
+            constraints["app"] = app
+        return constraints
     
     def _extract_element(self, text: str) -> str:
         """Extract element description from text."""
@@ -214,11 +287,37 @@ class GoalParser:
             return quoted
         
         # Try "click on [element]" pattern
-        match = re.search(r'click\s+(?:on\s+)?(.+)', text, re.IGNORECASE)
+        match = re.search(r'(?:click|tap)\s+(?:on\s+)?(.+?)(?:\s+in\s+\w[\w\s]+)?$', text, re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            element = match.group(1).strip()
+            element = re.sub(r'^(?:the|a|an)\s+', '', element, flags=re.IGNORECASE)
+            element = re.sub(
+                r'\s+(button|link|tab|field|textbox|text field|menu item|menu)$',
+                '',
+                element,
+                flags=re.IGNORECASE,
+            )
+            return element.strip()
         
         return "element"
+
+    def _extract_locator_text(self, text: str, fallback: str = "") -> str:
+        """Extract locator text separately from the broader element description."""
+        quoted = self._extract_quoted(text)
+        if quoted:
+            return quoted
+        return fallback
+
+    def _extract_locator_role(self, text: str) -> str:
+        """Extract a simple locator role when explicitly mentioned."""
+        match = re.search(
+            r'\b(button|link|tab|field|textbox|text field|menu item|menu)\b',
+            text,
+            re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).lower()
+        return ""
     
     def _extract_quoted(self, text: str) -> str:
         """Extract quoted text."""

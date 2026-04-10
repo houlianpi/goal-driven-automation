@@ -37,6 +37,25 @@ class TestGoalParser:
         assert goal.goal_type == GoalType.UI_NAVIGATION
         assert "click" in goal.actions
 
+    def test_parse_type_with_app_context(self, parser):
+        goal = parser.parse("In Safari, type 'hello world'")
+
+        assert goal.goal_type == GoalType.DATA_ENTRY
+        assert goal.target_app == "Safari"
+        assert goal.constraints["text"] == "hello world"
+        assert goal.constraints["app"] == "Safari"
+        assert goal.constraints["requires_focused_target"] is True
+
+    def test_parse_click_with_app_context_and_locator_metadata(self, parser):
+        goal = parser.parse("Click the Submit button in Edge")
+
+        assert goal.goal_type == GoalType.UI_NAVIGATION
+        assert goal.target_app == "Microsoft Edge"
+        assert goal.constraints["element"] == "Submit"
+        assert goal.constraints["app"] == "Microsoft Edge"
+        assert goal.constraints["locator_text"] == "Submit"
+        assert goal.constraints["locator_role"] == "button"
+
 
 class TestPlanGenerator:
     @pytest.fixture
@@ -73,6 +92,35 @@ class TestPlanGenerator:
         is_valid, errors = SchemaValidator().validate_plan(plan)
         assert is_valid is True, errors
 
+    def test_generate_type_plan_marks_ungrounded_context_for_review(self, generator):
+        parser = GoalParser()
+        goal = parser.parse("Type 'hello world'")
+
+        plan = generator.generate(goal)
+        step = plan["steps"][0]
+
+        assert step["action"] == "type"
+        assert step["params"]["text"] == "hello world"
+        assert step["params"]["requires_focused_target"] is True
+        assert step["metadata"]["context_confidence"] == "low"
+        assert step["review_required"] is True
+        assert step["on_fail"] == "human_review"
+
+    def test_generate_click_plan_preserves_context_metadata(self, generator):
+        parser = GoalParser()
+        goal = parser.parse("Click the Submit button in Edge")
+
+        plan = generator.generate(goal)
+        step = plan["steps"][0]
+
+        assert step["action"] == "click"
+        assert step["params"]["selector"] == "Submit"
+        assert step["params"]["locator_text"] == "Submit"
+        assert step["params"]["locator_role"] == "button"
+        assert step["params"]["app"] == "Microsoft Edge"
+        assert step["metadata"]["context_confidence"] == "medium"
+        assert step["review_required"] is False
+
 
 class TestPipeline:
     def test_pipeline_module_has_single_pipeline_class_definition(self):
@@ -95,8 +143,8 @@ actions:
     compile_to: mac app launch {bundle_id}
   hotkey:
     args:
-      keys: {type: array, required: true}
-    compile_to: mac input hotkey {keys}
+      combo: {type: string, required: true}
+    compile_to: mac input hotkey {combo}
   assert_visible:
     args:
       locator: {type: string, required: true}

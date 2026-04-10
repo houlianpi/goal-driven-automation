@@ -30,8 +30,8 @@ class TestCompiler:
         }
         result = compiler.compile_step(step)
         assert result["compiled_action"] == "hotkey"
-        assert result["command"] == "mac input hotkey command t"
-        assert result["argv"] == ["mac", "input", "hotkey", "command", "t"]
+        assert result["command"] == "mac input hotkey command+t"
+        assert result["argv"] == ["mac", "input", "hotkey", "command+t"]
 
     def test_compile_quotes_spaced_text_without_literal_quotes_in_argv(self):
         """Test spaced arguments stay single argv items without embedded quote characters."""
@@ -44,8 +44,45 @@ class TestCompiler:
 
         result = compiler.compile_step(step)
 
-        assert result["argv"] == ["mac", "input", "type", "hello world"]
+        assert result["argv"] == ["mac", "input", "text", "hello world"]
         assert '"hello world"' not in result["argv"]
+
+    def test_compile_type_step_ignores_context_metadata_for_command_generation(self):
+        """Test context metadata on type steps does not change compiled fsq-mac command."""
+        compiler = Compiler()
+        step = {
+            "step_id": "step_text_context",
+            "action": "type",
+            "params": {
+                "text": "hello world",
+                "app": "Safari",
+                "requires_focused_target": True,
+            },
+        }
+
+        result = compiler.compile_step(step)
+
+        assert result["compiled_action"] == "type_text"
+        assert result["argv"] == ["mac", "input", "text", "hello world"]
+
+    def test_compile_click_step_ignores_context_metadata_for_command_generation(self):
+        """Test context metadata on click steps does not change compiled fsq-mac command."""
+        compiler = Compiler()
+        step = {
+            "step_id": "step_click_context",
+            "action": "click",
+            "params": {
+                "selector": "Submit",
+                "app": "Microsoft Edge",
+                "locator_text": "Submit",
+                "locator_role": "button",
+            },
+        }
+
+        result = compiler.compile_step(step)
+
+        assert result["compiled_action"] == "element_click"
+        assert result["argv"] == ["mac", "element", "click", "Submit", "--strategy", "accessibility_id"]
 
     def test_compile_rejects_unresolved_placeholders(self, tmp_path):
         """Test unresolved registry placeholders fail compilation."""
@@ -103,16 +140,18 @@ actions:
         assert len(result["steps"]) == 3
         assert all("command" in s for s in result["steps"])
     
-    def test_compile_assert_requires_locator(self):
-        """Test semantic assert requires compiler-resolvable target."""
+    def test_compile_assert_without_locator_falls_back_to_non_blocking_wait(self):
+        """Test condition-only semantic assert still compiles for generic goal verification."""
         compiler = Compiler()
         step = {
             "step_id": "step_5",
             "action": "assert",
             "params": {"condition": "url.contains('example.com')"},
         }
-        with pytest.raises(CompilerError, match="requires 'locator' or 'selector'"):
-            compiler.compile_step(step)
+        result = compiler.compile_step(step)
+
+        assert result["compiled_action"] == "wait"
+        assert result["argv"] == ["sleep", "0"]
 
 
 class TestHelperFunctions:

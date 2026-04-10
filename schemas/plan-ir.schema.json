@@ -93,6 +93,13 @@
             "screenshot_after": {"type": "boolean"},
             "capture_ui_tree": {"type": "boolean"}
           }
+        },
+        "metadata": {
+          "type": "object",
+          "properties": {
+            "context_confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+          },
+          "additionalProperties": true
         }
       },
       "allOf": [
@@ -151,7 +158,10 @@
       "required": ["text"],
       "properties": {
         "text": {"type": "string"},
-        "delay_ms": {"type": "integer", "default": 50}
+        "delay_ms": {"type": "integer", "default": 50},
+        "app": {"type": "string"},
+        "requires_focused_target": {"type": "boolean"},
+        "input_target": {"type": "string"}
       },
       "additionalProperties": false
     },
@@ -159,6 +169,9 @@
       "type": "object",
       "properties": {
         "selector": {"type": "string", "description": "Accessibility selector"},
+        "app": {"type": "string"},
+        "locator_text": {"type": "string"},
+        "locator_role": {"type": "string"},
         "x": {"type": "number"},
         "y": {"type": "number"},
         "button": {"type": "string", "enum": ["left", "right"], "default": "left"}
