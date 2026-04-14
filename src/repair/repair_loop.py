@@ -47,14 +47,14 @@ class RepairResult:
 class RepairLoop:
     """Orchestrates failure recovery strategies."""
     
-    def __init__(self, max_iterations: int = 3):
+    def __init__(self, max_iterations: int = 3, mac_cli: str = "mac"):
         self.max_iterations = max_iterations
         self.evaluator = Evaluator()
-        
+
         # Strategy chain ordered by priority
         self.strategies: List[RepairStrategyBase] = [
             RetryStrategy(max_retries=2),
-            RestartStrategy(),
+            RestartStrategy(mac_cli=mac_cli),
             ReplanStrategy(),
             SkipStrategy(),
         ]

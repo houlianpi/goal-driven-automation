@@ -111,6 +111,43 @@ class Executor:
             return [self.mac_cli, *command[1:]]
         return command
 
+    # fsq-mac v0.3.0 error code → GDA classification mapping
+    _FSQ_ERROR_CLASSIFICATION = {
+        "ELEMENT_NOT_FOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_AMBIGUOUS": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_REFERENCE_STALE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_UNBOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_NOT_ACTIONABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "GEOMETRY_UNRELIABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "BACKEND_UNAVAILABLE": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_EXPIRED": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_CONFLICT": FailureClassification.ENVIRONMENT_FAILURE,
+        "BACKEND_RPC_TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+        "TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+        "WINDOW_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+        "ASSERTION_FAILED": FailureClassification.ASSERTION_FAILED,
+        "TYPE_VERIFICATION_FAILED": FailureClassification.ASSERTION_FAILED,
+        "PERMISSION_DENIED": FailureClassification.PRECONDITION_MISSING,
+        "ACTION_BLOCKED": FailureClassification.PRECONDITION_MISSING,
+        "APP_NOT_FOUND": FailureClassification.PRECONDITION_MISSING,
+        "INVALID_ARGUMENT": FailureClassification.PLAN_INVALID,
+        "TRACE_STEP_NOT_REPLAYABLE": FailureClassification.PLAN_INVALID,
+        "INTERNAL_ERROR": FailureClassification.ENVIRONMENT_FAILURE,
+    }
+
+    def _parse_fsq_response(self, stdout: str) -> Optional[Dict[str, Any]]:
+        """Try to parse stdout as a fsq-mac v0.3.0 JSON envelope."""
+        if not stdout or not stdout.strip():
+            return None
+        try:
+            parsed = json.loads(stdout)
+            if isinstance(parsed, dict) and "ok" in parsed:
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return None
+
     def _is_mac_command(self, command: List[str]) -> bool:
         """Return True when the argv targets fsq-mac."""
         if not command:
@@ -216,22 +253,36 @@ class Executor:
         
         # Execute with retry
         retry_policy = step.get("retry_policy", {})
-        max_attempts = retry_policy.get("max", 1)
+        max_attempts = retry_policy.get("max_attempts", retry_policy.get("max", 1))
         backoff = retry_policy.get("backoff", "none")
         delay_ms = retry_policy.get("delay_ms", 1000)
         
         last_result = None
+        last_parsed = None
         for attempt in range(max_attempts):
             result = self.execute_command(argv)
             last_result = result
+
+            # Try to parse fsq-mac JSON envelope
+            parsed = self._parse_fsq_response(result["stdout"])
+            last_parsed = parsed
 
             if len(argv) >= 3 and argv[1] == "session":
                 if argv[2] == "start" and result["return_code"] == 0:
                     self._session_bootstrapped = True
                 elif argv[2] == "end" and result["return_code"] == 0:
                     self._session_bootstrapped = False
-            
-            if result["return_code"] == 0:
+
+            # Determine success: prefer JSON ok field, fall back to return_code
+            success = parsed["ok"] if parsed and "ok" in parsed else result["return_code"] == 0
+
+            if success:
+                evidence_data = {
+                    "command_output": result["stdout"],
+                    "attempt": attempt + 1,
+                }
+                if parsed:
+                    evidence_data["fsq_response"] = parsed
                 return StepResult(
                     step_id=step_id,
                     success=True,
@@ -241,10 +292,7 @@ class Executor:
                     stderr=result["stderr"],
                     return_code=result["return_code"],
                     duration_ms=result["duration_ms"],
-                    evidence={
-                        "command_output": result["stdout"],
-                        "attempt": attempt + 1,
-                    },
+                    evidence=evidence_data,
                 )
             
             # Backoff before retry
@@ -256,6 +304,10 @@ class Executor:
                 else:
                     time.sleep(delay_ms / 1000.0)
         
+        evidence_data = {}
+        if last_parsed:
+            evidence_data["fsq_response"] = last_parsed
+
         return StepResult(
             step_id=step_id,
             success=False,
@@ -265,6 +317,7 @@ class Executor:
             stderr=last_result.get("stderr", ""),
             return_code=last_result.get("return_code", -1),
             duration_ms=last_result.get("duration_ms", 0),
+            evidence=evidence_data,
             error=f"Failed after {max_attempts} attempts",
         )
     
@@ -314,11 +367,17 @@ class Executor:
 
         for step_result, step in zip(plan_result.step_results, plan.get("steps", [])):
             error = None
+            fsq_response = step_result.evidence.get("fsq_response") if step_result.evidence else None
+
             if not step_result.success:
+                fsq_error = fsq_response.get("error") if isinstance(fsq_response, dict) else None
                 error = StepError(
                     type="ExecutionError",
                     message=step_result.error or step_result.stderr or "Step execution failed",
                     classification=self._classify_failure(step_result),
+                    fsq_error_code=fsq_error.get("code") if isinstance(fsq_error, dict) else None,
+                    fsq_retryable=fsq_error.get("retryable") if isinstance(fsq_error, dict) else None,
+                    fsq_suggested_action=fsq_error.get("suggested_next_action") if isinstance(fsq_error, dict) else None,
                 )
 
             step_evidence = StepEvidence(
@@ -332,6 +391,7 @@ class Executor:
                     stdout=step_result.stdout,
                     stderr=step_result.stderr,
                     duration_ms=step_result.duration_ms,
+                    parsed_response=fsq_response,
                 ),
                 error=error,
                 retry_count=max(step_result.evidence.get("attempt", 1) - 1, 0),
@@ -345,6 +405,14 @@ class Executor:
 
     def _classify_failure(self, step_result: StepResult) -> FailureClassification:
         """Map executor step failures to coarse evidence classifications."""
+        # Priority 1: Use structured fsq-mac error.code if available
+        fsq_response = step_result.evidence.get("fsq_response") if step_result.evidence else None
+        if fsq_response and isinstance(fsq_response.get("error"), dict):
+            error_code = fsq_response["error"].get("code", "")
+            if error_code in self._FSQ_ERROR_CLASSIFICATION:
+                return self._FSQ_ERROR_CLASSIFICATION[error_code]
+
+        # Priority 2: Regex-based fallback
         text = f"{step_result.stderr} {step_result.error}".lower()
         if "timed out" in text or step_result.return_code == -1:
             return FailureClassification.ENVIRONMENT_FAILURE

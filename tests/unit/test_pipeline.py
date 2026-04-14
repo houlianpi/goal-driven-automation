@@ -147,9 +147,16 @@ actions:
     compile_to: mac input hotkey {combo}
   assert_visible:
     args:
-      locator: {type: string, required: true}
-      strategy: {type: string, required: false, default: accessibility_id}
-    compile_to: mac assert visible \"{locator}\" --strategy {strategy}
+      ref: {type: string, required: false}
+      role: {type: string, required: false}
+      name: {type: string, required: false}
+      label: {type: string, required: false}
+      id: {type: string, required: false}
+    compile_to: __assert_argv__
+  wait:
+    args:
+      seconds: {type: number, required: true}
+    compile_to: sleep {seconds}
 """)
             
             pipeline = Pipeline(base_dir=Path(tmpdir))
@@ -221,14 +228,22 @@ actions:
       bundle_id: {type: string, required: true}
     compile_to: mac app launch {bundle_id}
     expected_evidence: [process_running]
-    default_retry: {max: 1}
+    default_retry: {max_attempts: 1}
   assert_visible:
     args:
-      locator: {type: string, required: true}
-      strategy: {type: string, required: false, default: accessibility_id}
-    compile_to: mac assert visible "{locator}" --strategy {strategy}
+      ref: {type: string, required: false}
+      role: {type: string, required: false}
+      name: {type: string, required: false}
+      label: {type: string, required: false}
+      id: {type: string, required: false}
+    compile_to: __assert_argv__
     expected_evidence: [assertion_result]
-    default_retry: {max: 1}
+    default_retry: {max_attempts: 1}
+  wait:
+    args:
+      seconds: {type: number, required: true}
+    compile_to: sleep {seconds}
+    default_retry: {max_attempts: 1}
 """
             )
 
@@ -254,14 +269,22 @@ actions:
       bundle_id: {type: string, required: true}
     compile_to: mac app launch {bundle_id}
     expected_evidence: [process_running]
-    default_retry: {max: 1}
+    default_retry: {max_attempts: 1}
   assert_visible:
     args:
-      locator: {type: string, required: true}
-      strategy: {type: string, required: false, default: accessibility_id}
-    compile_to: mac assert visible {locator} --strategy {strategy}
+      ref: {type: string, required: false}
+      role: {type: string, required: false}
+      name: {type: string, required: false}
+      label: {type: string, required: false}
+      id: {type: string, required: false}
+    compile_to: __assert_argv__
     expected_evidence: [assertion_result]
-    default_retry: {max: 1}
+    default_retry: {max_attempts: 1}
+  wait:
+    args:
+      seconds: {type: number, required: true}
+    compile_to: sleep {seconds}
+    default_retry: {max_attempts: 1}
 """
             )
 

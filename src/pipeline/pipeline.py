@@ -126,7 +126,7 @@ class Pipeline:
         self.executor = Executor()
         self.evidence_storage = EvidenceStorage(self.base_dir / "data" / "runs")
         self.evaluator = Evaluator()
-        self.repair_loop = RepairLoop()
+        self.repair_loop = RepairLoop(mac_cli=self.mac_cli)
         self.evolution = EvolutionEngine(self.base_dir)
     
     def run(self, goal_text: str, dry_run: bool = False) -> PipelineResult:

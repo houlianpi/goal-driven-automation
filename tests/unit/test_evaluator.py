@@ -147,3 +147,63 @@ class TestEvaluator:
         run.add_step(StepEvidence(step_id="s3", action="type", status=StepStatus.FAILURE))
         failed = evaluator.get_failed_steps(run)
         assert failed == ["s3"]
+
+
+class TestClassifierV030:
+    """Tests for fsq-mac v0.3.0 structured error code classification."""
+
+    @pytest.fixture
+    def classifier(self):
+        return FailureClassifier()
+
+    def test_classify_from_output_prefers_json_error_code(self, classifier):
+        """Structured error.code takes priority over regex patterns."""
+        cli = CLICommand(
+            command=["mac", "element", "click"],
+            exit_code=1,
+            stdout="",
+            stderr="Element not found",
+            parsed_response={
+                "ok": False,
+                "error": {"code": "ELEMENT_NOT_FOUND", "message": "No match", "retryable": True},
+            },
+        )
+        classification, confidence, details = classifier._classify_from_output(cli)
+        assert classification == FailureClassification.OBSERVATION_INSUFFICIENT
+        assert confidence == 0.95
+        assert "fsq-mac error" in details
+
+    def test_classify_from_output_falls_back_to_regex(self, classifier):
+        """Without parsed_response, fallback to regex patterns."""
+        cli = CLICommand(
+            command=["mac", "element", "click"],
+            exit_code=1,
+            stdout="",
+            stderr="Element not found",
+        )
+        classification, confidence, _ = classifier._classify_from_output(cli)
+        assert classification == FailureClassification.OBSERVATION_INSUFFICIENT
+        assert confidence == 0.8
+
+    def test_classify_honors_fsq_retryable_true(self, classifier):
+        """fsq_retryable=True overrides default retry_likely_to_help."""
+        error = StepError(
+            "ASSERTION_FAILED", "Failed",
+            FailureClassification.ASSERTION_FAILED,
+            fsq_retryable=True,
+        )
+        step = StepEvidence(step_id="s1", action="assert", status=StepStatus.FAILURE, error=error)
+        result = classifier.classify(step)
+        assert result.retry_likely_to_help is True
+        assert result.recommended_strategy == RepairStrategy.RETRY
+
+    def test_classify_honors_fsq_retryable_false(self, classifier):
+        """fsq_retryable=False overrides default retry_likely_to_help."""
+        error = StepError(
+            "ELEMENT_NOT_FOUND", "No match",
+            FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_retryable=False,
+        )
+        step = StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error)
+        result = classifier.classify(step)
+        assert result.retry_likely_to_help is False

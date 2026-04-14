@@ -1,6 +1,7 @@
 """
 Mock Executor - Simulates execution for testing without fsq-mac CLI.
 """
+import os
 import random
 import time
 from pathlib import Path
@@ -17,10 +18,11 @@ from src.time_utils import utc_now
 
 class MockExecutor:
     """Simulates plan execution for testing."""
-    
+
     def __init__(self, runs_dir: Optional[Path] = None, failure_rate: float = 0.3):
         self.runs_dir = runs_dir or Path("data/runs")
         self.failure_rate = failure_rate
+        self.mac_cli = os.environ.get("FSQ_MAC_CLI", "mac")
         self.forced_failures: Dict[str, str] = {}  # step_id -> error_type
     
     def force_failure(self, step_id: str, error_type: str = "timeout"):
@@ -84,14 +86,23 @@ class MockExecutor:
         finished_at = utc_now()
         duration_ms = int((finished_at - started_at).total_seconds() * 1000)
         
-        # Simulate CLI command
+        # Simulate CLI command with v0.3.0 JSON envelope
         command = self._build_command(action, params)
+        envelope = {
+            "ok": True,
+            "command": f"{action}",
+            "session_id": "mock-session",
+            "data": {},
+            "error": None,
+            "meta": {"duration_ms": duration_ms},
+        }
         cli = CLICommand(
             command=command,
             exit_code=0,
-            stdout=f"Success: {action} completed",
+            stdout=json.dumps(envelope),
             stderr="",
             duration_ms=duration_ms,
+            parsed_response=envelope,
         )
         
         # Create mock artifacts
@@ -128,18 +139,39 @@ class MockExecutor:
         
         classification, message = error_map.get(error_type, (FailureClassification.ENVIRONMENT_FAILURE, "Unknown error"))
         
+        # Map error types to fsq-mac v0.3.0 error codes
+        fsq_error_map = {
+            "timeout": ("TIMEOUT", True),
+            "element_not_found": ("ELEMENT_NOT_FOUND", True),
+            "session_error": ("SESSION_NOT_FOUND", False),
+            "permission": ("PERMISSION_DENIED", False),
+        }
+        fsq_code, fsq_retryable = fsq_error_map.get(error_type, ("INTERNAL_ERROR", False))
+
+        envelope = {
+            "ok": False,
+            "command": action,
+            "session_id": None,
+            "data": None,
+            "error": {"code": fsq_code, "message": message, "retryable": fsq_retryable, "details": {}, "suggested_next_action": None, "doctor_hint": None},
+            "meta": {},
+        }
+
         cli = CLICommand(
             command=["mac", action],
             exit_code=1,
-            stdout="",
+            stdout=json.dumps(envelope),
             stderr=message,
             duration_ms=duration_ms,
+            parsed_response=envelope,
         )
         
         error = StepError(
             type=error_type,
             message=message,
             classification=classification,
+            fsq_error_code=fsq_code,
+            fsq_retryable=fsq_retryable,
         )
         
         return StepEvidence(
@@ -166,9 +198,21 @@ class MockExecutor:
             keys = params.get("keys", [])
             return ["mac", "input", "hotkey", *keys]
         elif action == "type":
-            return ["mac", "input", "type", params.get("text", "")]
+            return ["mac", "input", "text", params.get("text", "")]
+        elif action in ("click", "element_click"):
+            argv = ["mac", "element", "click"]
+            if params.get("role"):
+                argv += ["--role", params["role"]]
+            if params.get("name"):
+                argv += ["--name", params["name"]]
+            return argv
         elif action == "assert_visible":
-            return ["mac", "assert", "visible", params.get("locator", "element")]
+            argv = ["mac", "assert", "visible"]
+            if params.get("role"):
+                argv += ["--role", params["role"]]
+            if params.get("name"):
+                argv += ["--name", params["name"]]
+            return argv
         elif action == "assert":
             locator = params.get("locator", params.get("condition", "element"))
             return ["mac", "assert", "visible", locator]

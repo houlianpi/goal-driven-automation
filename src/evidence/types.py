@@ -62,15 +62,19 @@ class CLICommand:
     stdout: str = ""
     stderr: str = ""
     duration_ms: int = 0
-    
+    parsed_response: Optional[Dict[str, Any]] = None
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "command": self.command,
             "exit_code": self.exit_code,
             "stdout": self.stdout,
             "stderr": self.stderr,
             "duration_ms": self.duration_ms,
         }
+        if self.parsed_response is not None:
+            result["parsed_response"] = self.parsed_response
+        return result
 
 
 @dataclass
@@ -80,14 +84,24 @@ class StepError:
     message: str
     classification: FailureClassification
     stacktrace: Optional[str] = None
-    
+    fsq_error_code: Optional[str] = None
+    fsq_retryable: Optional[bool] = None
+    fsq_suggested_action: Optional[str] = None
+
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "type": self.type,
             "message": self.message,
             "classification": self.classification.value,
             "stacktrace": self.stacktrace,
         }
+        if self.fsq_error_code is not None:
+            result["fsq_error_code"] = self.fsq_error_code
+        if self.fsq_retryable is not None:
+            result["fsq_retryable"] = self.fsq_retryable
+        if self.fsq_suggested_action is not None:
+            result["fsq_suggested_action"] = self.fsq_suggested_action
+        return result
 
 
 @dataclass

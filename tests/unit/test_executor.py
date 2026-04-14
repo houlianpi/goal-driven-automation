@@ -223,3 +223,102 @@ class TestHelperFunctions:
 
         _, kwargs = mock_run.call_args
         assert kwargs["shell"] is False
+
+
+class TestV030JsonEnvelope:
+    """Tests for fsq-mac v0.3.0 JSON envelope parsing."""
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_parse_fsq_response_valid_envelope(self, mock_run):
+        """Test that valid JSON envelope is parsed."""
+        envelope = '{"ok": true, "command": "app.launch", "session_id": "s1", "data": {}, "error": null, "meta": {}}'
+        mock_run.return_value = MagicMock(returncode=0, stdout=envelope, stderr="")
+
+        executor = Executor()
+        result = executor._parse_fsq_response(envelope)
+
+        assert result is not None
+        assert result["ok"] is True
+
+    def test_parse_fsq_response_non_json(self):
+        executor = Executor()
+        assert executor._parse_fsq_response("not json") is None
+
+    def test_parse_fsq_response_empty(self):
+        executor = Executor()
+        assert executor._parse_fsq_response("") is None
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_step_detects_ok_false_as_failure(self, mock_run):
+        """Test that ok=false in JSON envelope marks step as failed even with exit_code=0."""
+        envelope = '{"ok": false, "command": "element.click", "session_id": "s1", "data": null, "error": {"code": "ELEMENT_NOT_FOUND", "message": "No match", "retryable": true, "details": {}, "suggested_next_action": null, "doctor_hint": null}, "meta": {}}'
+        mock_run.return_value = MagicMock(returncode=1, stdout=envelope, stderr="")
+
+        executor = Executor()
+        executor._session_bootstrapped = True
+        step = {
+            "step_id": "s1",
+            "command": "mac element click --name Foo",
+            "argv": ["echo", "test"],
+            "retry_policy": {"max_attempts": 1},
+        }
+
+        result = executor.execute_step(step)
+        assert result.success is False
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_returns_evidence_with_fsq_error_fields(self, mock_run):
+        """Test that RunEvidence StepError includes fsq_error_code and fsq_retryable."""
+        envelope = '{"ok": false, "command": "element.click", "session_id": null, "data": null, "error": {"code": "ELEMENT_NOT_FOUND", "message": "No match", "retryable": true, "details": {}, "suggested_next_action": "element inspect", "doctor_hint": null}, "meta": {}}'
+        mock_run.return_value = MagicMock(returncode=1, stdout=envelope, stderr="")
+
+        executor = Executor()
+        executor._session_bootstrapped = True
+
+        plan = {
+            "plan_id": "plan-test",
+            "steps": [
+                {
+                    "step_id": "s1",
+                    "action": "element_click",
+                    "command": "mac element click --name Foo",
+                    "argv": ["echo", "test"],
+                    "on_fail": "skip",
+                },
+            ],
+        }
+
+        evidence = executor.execute(plan)
+        step_ev = evidence.steps[0]
+
+        assert step_ev.error is not None
+        assert step_ev.error.fsq_error_code == "ELEMENT_NOT_FOUND"
+        assert step_ev.error.fsq_retryable is True
+        assert step_ev.error.fsq_suggested_action == "element inspect"
+
+    def test_classify_failure_uses_fsq_error_code(self):
+        """Test _classify_failure prioritizes fsq-mac error.code."""
+        executor = Executor()
+        step_result = StepResult(
+            step_id="s1", success=False, command="test",
+            stderr="", return_code=1,
+            evidence={
+                "fsq_response": {
+                    "ok": False,
+                    "error": {"code": "ASSERTION_FAILED", "message": "Failed", "retryable": False},
+                }
+            },
+        )
+        from src.evidence.types import FailureClassification
+        assert executor._classify_failure(step_result) == FailureClassification.ASSERTION_FAILED
+
+    def test_classify_failure_falls_back_to_regex(self):
+        """Test _classify_failure falls back to regex when no JSON envelope."""
+        executor = Executor()
+        step_result = StepResult(
+            step_id="s1", success=False, command="test",
+            stderr="timed out after 60s", return_code=-1,
+            evidence={},
+        )
+        from src.evidence.types import FailureClassification
+        assert executor._classify_failure(step_result) == FailureClassification.ENVIRONMENT_FAILURE

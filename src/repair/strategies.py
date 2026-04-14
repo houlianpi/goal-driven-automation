@@ -52,6 +52,9 @@ class RetryStrategy(RepairStrategyBase):
         """Retry works for transient failures."""
         if not step.error:
             return False
+        # Honor fsq-mac retryable flag if available
+        if step.error.fsq_retryable is True:
+            return True
         from src.evidence.types import FailureClassification
         retryable = [
             FailureClassification.ENVIRONMENT_FAILURE,
@@ -176,9 +179,9 @@ class ReplanStrategy(RepairStrategyBase):
     
     def __init__(self):
         self.alternatives = {
-            "click": ["element_click", "coordinate_click"],
-            "type": ["element_type", "keyboard_type"],
-            "wait": ["wait_explicit", "wait_polling"],
+            "click": ["element_click", "input_click_at"],
+            "type": ["element_type", "type_text"],
+            "wait": ["wait_for_element", "wait"],
         }
     
     def can_handle(self, step: StepEvidence) -> bool:

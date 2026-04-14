@@ -19,6 +19,32 @@ from .types import (
 from src.time_utils import utc_now
 
 
+# fsq-mac v0.3.0 error code → classification mapping
+_FSQ_ERROR_CLASSIFICATION = {
+    "ELEMENT_NOT_FOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "ELEMENT_AMBIGUOUS": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "ELEMENT_REFERENCE_STALE": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "ELEMENT_UNBOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "ELEMENT_NOT_ACTIONABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "GEOMETRY_UNRELIABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+    "BACKEND_UNAVAILABLE": FailureClassification.ENVIRONMENT_FAILURE,
+    "SESSION_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+    "SESSION_EXPIRED": FailureClassification.ENVIRONMENT_FAILURE,
+    "SESSION_CONFLICT": FailureClassification.ENVIRONMENT_FAILURE,
+    "BACKEND_RPC_TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+    "TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+    "WINDOW_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+    "ASSERTION_FAILED": FailureClassification.ASSERTION_FAILED,
+    "TYPE_VERIFICATION_FAILED": FailureClassification.ASSERTION_FAILED,
+    "PERMISSION_DENIED": FailureClassification.PRECONDITION_MISSING,
+    "ACTION_BLOCKED": FailureClassification.PRECONDITION_MISSING,
+    "APP_NOT_FOUND": FailureClassification.PRECONDITION_MISSING,
+    "INVALID_ARGUMENT": FailureClassification.PLAN_INVALID,
+    "TRACE_STEP_NOT_REPLAYABLE": FailureClassification.PLAN_INVALID,
+    "INTERNAL_ERROR": FailureClassification.ENVIRONMENT_FAILURE,
+}
+
+
 class EvidenceCollector:
     """Collects evidence during plan execution."""
     
@@ -55,10 +81,11 @@ class EvidenceCollector:
         filepath = self.run_dir / "ui_trees" / filename
         try:
             result = subprocess.run(
-                [self.mac_cli, "capture", "ui-tree", "--output", str(filepath)],
+                [self.mac_cli, "capture", "ui-tree"],
                 capture_output=True, text=True, timeout=30,
             )
-            if result.returncode == 0 and filepath.exists():
+            if result.returncode == 0 and result.stdout:
+                filepath.write_text(result.stdout)
                 return Artifact(
                     type=f"ui_tree_{suffix}" if suffix else "ui_tree",
                     path=f"ui_trees/{filename}",
@@ -86,7 +113,7 @@ class EvidenceCollector:
             if artifact := self.capture_ui_tree(step_id, "before"):
                 artifacts.append(artifact)
         
-        max_attempts = retry_policy.get("max_attempts", 1)
+        max_attempts = retry_policy.get("max_attempts", retry_policy.get("max", 1))
         backoff = retry_policy.get("backoff", "none")
         delay_ms = retry_policy.get("delay_ms", 1000)
         last_result = None
@@ -140,6 +167,23 @@ class EvidenceCollector:
     def _classify_error(self, cli_result: Optional[CLICommand]) -> Optional[StepError]:
         if not cli_result or cli_result.exit_code == 0:
             return None
+
+        # Priority 1: structured fsq-mac JSON envelope
+        parsed = self._parse_fsq_response(cli_result.stdout)
+        if parsed and isinstance(parsed.get("error"), dict):
+            fsq_error = parsed["error"]
+            error_code = fsq_error.get("code", "")
+            classification = _FSQ_ERROR_CLASSIFICATION.get(
+                error_code, FailureClassification.ENVIRONMENT_FAILURE
+            )
+            return StepError(
+                error_code, fsq_error.get("message", "")[:500], classification,
+                fsq_error_code=error_code,
+                fsq_retryable=fsq_error.get("retryable"),
+                fsq_suggested_action=fsq_error.get("suggested_next_action"),
+            )
+
+        # Priority 2: regex-based fallback
         stderr = cli_result.stderr.lower()
         if "not found" in stderr or "no such" in stderr:
             return StepError("NotFound", cli_result.stderr[:500], FailureClassification.CAPABILITY_UNAVAILABLE)
@@ -152,6 +196,18 @@ class EvidenceCollector:
         elif "assert" in stderr:
             return StepError("AssertionFailed", cli_result.stderr[:500], FailureClassification.ASSERTION_FAILED)
         return StepError("UnknownError", cli_result.stderr[:500] or "Command failed", FailureClassification.ENVIRONMENT_FAILURE)
+
+    def _parse_fsq_response(self, stdout: str) -> Optional[Dict]:
+        """Try to parse stdout as a fsq-mac v0.3.0 JSON envelope."""
+        if not stdout or not stdout.strip():
+            return None
+        try:
+            parsed = json.loads(stdout)
+            if isinstance(parsed, dict) and "ok" in parsed:
+                return parsed
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return None
     
     def _log_command(self, step_id: str, cli_result: Optional[CLICommand]):
         log_path = self.run_dir / "logs" / "cli_commands.jsonl"

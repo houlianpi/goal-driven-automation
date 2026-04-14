@@ -103,30 +103,39 @@ class FailureClassifier:
     def classify(self, step: StepEvidence) -> Optional[ClassificationResult]:
         """
         Classify a failed step.
-        
+
         Args:
             step: Failed step evidence
-            
+
         Returns:
             ClassificationResult with classification and recommendations
         """
         if step.status in {StepStatus.SUCCESS, StepStatus.REPAIRED, StepStatus.SKIPPED}:
             return None
-        
+
         # Use existing error classification if available
         if step.error:
             classification = step.error.classification
             confidence = 0.9
             details = step.error.message
+
+            # Override retry_likely_to_help from fsq_retryable if available
+            strategy, retry_helps, needs_human = self.STRATEGY_MAP.get(
+                classification,
+                (RepairStrategy.HUMAN_REVIEW, False, True)
+            )
+            if step.error.fsq_retryable is not None:
+                retry_helps = step.error.fsq_retryable
+                if retry_helps and strategy not in (RepairStrategy.RETRY, RepairStrategy.RESTART_SESSION):
+                    strategy = RepairStrategy.RETRY
         else:
-            # Classify from CLI output
+            # Classify from CLI output (structured or regex)
             classification, confidence, details = self._classify_from_output(step.cli_command)
-        
-        strategy, retry_helps, needs_human = self.STRATEGY_MAP.get(
-            classification,
-            (RepairStrategy.HUMAN_REVIEW, False, True)
-        )
-        
+            strategy, retry_helps, needs_human = self.STRATEGY_MAP.get(
+                classification,
+                (RepairStrategy.HUMAN_REVIEW, False, True)
+            )
+
         return ClassificationResult(
             classification=classification,
             confidence=confidence,
@@ -136,18 +145,51 @@ class FailureClassifier:
             requires_human=needs_human,
         )
     
+    # fsq-mac v0.3.0 error code → classification mapping
+    _FSQ_ERROR_CLASSIFICATION = {
+        "ELEMENT_NOT_FOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_AMBIGUOUS": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_REFERENCE_STALE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_UNBOUND": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "ELEMENT_NOT_ACTIONABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "GEOMETRY_UNRELIABLE": FailureClassification.OBSERVATION_INSUFFICIENT,
+        "BACKEND_UNAVAILABLE": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_EXPIRED": FailureClassification.ENVIRONMENT_FAILURE,
+        "SESSION_CONFLICT": FailureClassification.ENVIRONMENT_FAILURE,
+        "BACKEND_RPC_TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+        "TIMEOUT": FailureClassification.ENVIRONMENT_FAILURE,
+        "WINDOW_NOT_FOUND": FailureClassification.ENVIRONMENT_FAILURE,
+        "ASSERTION_FAILED": FailureClassification.ASSERTION_FAILED,
+        "TYPE_VERIFICATION_FAILED": FailureClassification.ASSERTION_FAILED,
+        "PERMISSION_DENIED": FailureClassification.PRECONDITION_MISSING,
+        "ACTION_BLOCKED": FailureClassification.PRECONDITION_MISSING,
+        "APP_NOT_FOUND": FailureClassification.PRECONDITION_MISSING,
+        "INVALID_ARGUMENT": FailureClassification.PLAN_INVALID,
+        "TRACE_STEP_NOT_REPLAYABLE": FailureClassification.PLAN_INVALID,
+        "INTERNAL_ERROR": FailureClassification.ENVIRONMENT_FAILURE,
+    }
+
     def _classify_from_output(self, cli: Optional[CLICommand]) -> tuple:
         """Classify based on CLI output patterns."""
         if not cli:
             return (FailureClassification.ENVIRONMENT_FAILURE, 0.5, "No CLI output available")
-        
+
+        # Priority 1: structured fsq-mac JSON envelope error.code
+        if cli.parsed_response and isinstance(cli.parsed_response.get("error"), dict):
+            error_code = cli.parsed_response["error"].get("code", "")
+            if error_code in self._FSQ_ERROR_CLASSIFICATION:
+                message = cli.parsed_response["error"].get("message", error_code)
+                return (self._FSQ_ERROR_CLASSIFICATION[error_code], 0.95, f"fsq-mac error: {message}")
+
+        # Priority 2: regex-based pattern matching
         text = (cli.stdout + " " + cli.stderr).lower()
-        
+
         for classification, patterns in self.PATTERNS.items():
             for pattern in patterns:
                 if re.search(pattern, text, re.IGNORECASE):
                     return (classification, 0.8, f"Matched pattern: {pattern}")
-        
+
         # Default classification based on exit code
         if cli.exit_code == -1:
             return (FailureClassification.ENVIRONMENT_FAILURE, 0.6, "Command timed out")
@@ -155,7 +197,7 @@ class FailureClassifier:
             return (FailureClassification.CAPABILITY_UNAVAILABLE, 0.9, "Command not found")
         elif cli.exit_code == 1:
             return (FailureClassification.ENVIRONMENT_FAILURE, 0.5, "Generic failure")
-        
+
         return (FailureClassification.ENVIRONMENT_FAILURE, 0.4, "Unknown failure type")
     
     def classify_batch(self, steps: List[StepEvidence]) -> List[ClassificationResult]:
