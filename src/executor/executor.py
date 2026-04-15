@@ -148,6 +148,28 @@ class Executor:
             pass
         return None
 
+    def _extract_success_evidence(self, parsed: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract structured success payload fields from a parsed fsq envelope."""
+        if not parsed or not parsed.get("ok"):
+            return {}
+
+        data = parsed.get("data") or {}
+        meta = parsed.get("meta") or {}
+        extracted: Dict[str, Any] = {}
+
+        if parsed.get("session_id") is not None:
+            extracted["session_id"] = parsed["session_id"]
+        if data.get("resolved_element") is not None:
+            extracted["resolved_element"] = data["resolved_element"]
+        if data.get("snapshot") is not None:
+            extracted["snapshot"] = data["snapshot"]
+        if data.get("actionability_used") is not None:
+            extracted["actionability_used"] = data["actionability_used"]
+        if meta.get("duration_ms") is not None:
+            extracted["upstream_duration_ms"] = meta["duration_ms"]
+
+        return extracted
+
     def _is_mac_command(self, command: List[str]) -> bool:
         """Return True when the argv targets fsq-mac."""
         if not command:
@@ -283,6 +305,7 @@ class Executor:
                 }
                 if parsed:
                     evidence_data["fsq_response"] = parsed
+                    evidence_data.update(self._extract_success_evidence(parsed))
                 return StepResult(
                     step_id=step_id,
                     success=True,
@@ -392,6 +415,11 @@ class Executor:
                     stderr=step_result.stderr,
                     duration_ms=step_result.duration_ms,
                     parsed_response=fsq_response,
+                    session_id=step_result.evidence.get("session_id"),
+                    resolved_element=step_result.evidence.get("resolved_element"),
+                    snapshot=step_result.evidence.get("snapshot"),
+                    actionability_used=step_result.evidence.get("actionability_used"),
+                    upstream_duration_ms=step_result.evidence.get("upstream_duration_ms"),
                 ),
                 error=error,
                 retry_count=max(step_result.evidence.get("attempt", 1) - 1, 0),

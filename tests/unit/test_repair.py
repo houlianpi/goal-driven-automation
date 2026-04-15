@@ -11,6 +11,36 @@ from src.repair.strategies import (
 from src.repair.repair_loop import RepairLoop, RepairOutcome
 
 
+def build_failed_step(
+    *,
+    step_id="s1",
+    action="click",
+    command=None,
+    classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+    fsq_error_code=None,
+    fsq_retryable=None,
+    retry_count=0,
+):
+    cli = None
+    if command is not None:
+        cli = CLICommand(command=command, exit_code=1, stderr="failed")
+    error = StepError(
+        "Error",
+        "failed",
+        classification,
+        fsq_error_code=fsq_error_code,
+        fsq_retryable=fsq_retryable,
+    )
+    return StepEvidence(
+        step_id=step_id,
+        action=action,
+        status=StepStatus.FAILURE,
+        error=error,
+        cli_command=cli,
+        retry_count=retry_count,
+    )
+
+
 class TestRetryStrategy:
     def test_can_handle_environment_failure(self):
         strategy = RetryStrategy()
@@ -23,7 +53,39 @@ class TestRetryStrategy:
         error = StepError("Invalid", "bad plan", FailureClassification.PLAN_INVALID)
         step = StepEvidence(step_id="s1", action="click", status=StepStatus.FAILURE, error=error)
         assert strategy.can_handle(step) is False
-    
+
+    def test_retryable_false_overrides_classification(self):
+        strategy = RetryStrategy()
+        step = build_failed_step(
+            classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_error_code="ELEMENT_NOT_FOUND",
+            fsq_retryable=False,
+        )
+
+        assert strategy.can_handle(step) is False
+
+    def test_backend_unavailable_is_deferred_to_restart_strategy(self):
+        strategy = RetryStrategy()
+        step = build_failed_step(
+            classification=FailureClassification.ENVIRONMENT_FAILURE,
+            fsq_error_code="BACKEND_UNAVAILABLE",
+            fsq_retryable=True,
+        )
+
+        assert strategy.can_handle(step) is False
+
+    def test_stale_ref_is_not_retried_verbatim(self):
+        strategy = RetryStrategy()
+        step = build_failed_step(
+            action="element_click",
+            command=["mac", "element", "click", "e3"],
+            classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_error_code="ELEMENT_REFERENCE_STALE",
+            fsq_retryable=True,
+        )
+
+        assert strategy.can_handle(step) is False
+
     @patch("subprocess.run")
     def test_retry_succeeds(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0, stdout="ok", stderr="")
@@ -36,6 +98,118 @@ class TestRetryStrategy:
         assert result.step_evidence is not None
         _, kwargs = mock_run.call_args
         assert kwargs["shell"] is False
+
+    @patch("src.repair.strategies.time.sleep")
+    @patch("src.repair.strategies.subprocess.run")
+    def test_element_not_found_runs_inspect_before_retry(self, mock_run, _mock_sleep):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout='{"ok": true}', stderr=""),
+            MagicMock(returncode=0, stdout="ok", stderr=""),
+        ]
+        strategy = RetryStrategy(max_retries=1, backoff_ms=1)
+        step = build_failed_step(
+            action="element_click",
+            command=["mac", "element", "click", "--name", "Submit"],
+            classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_error_code="ELEMENT_NOT_FOUND",
+            fsq_retryable=True,
+        )
+
+        result = strategy.apply(step, {})
+
+        assert result.success is True
+        assert mock_run.call_args_list[0].args[0] == ["mac", "element", "inspect"]
+        assert mock_run.call_args_list[1].args[0] == ["mac", "element", "click", "--name", "Submit"]
+
+    @patch("src.repair.strategies.time.sleep")
+    @patch("src.repair.strategies.subprocess.run")
+    def test_element_not_found_uses_configured_mac_cli_for_inspect(self, mock_run, _mock_sleep):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout='{"ok": true}', stderr=""),
+            MagicMock(returncode=0, stdout="ok", stderr=""),
+        ]
+        strategy = RetryStrategy(max_retries=1, backoff_ms=1, mac_cli="/tmp/fsq-mac")
+        step = build_failed_step(
+            action="element_click",
+            command=["/tmp/fsq-mac", "element", "click", "--name", "Submit"],
+            classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_error_code="ELEMENT_NOT_FOUND",
+            fsq_retryable=True,
+        )
+
+        result = strategy.apply(step, {})
+
+        assert result.success is True
+        assert mock_run.call_args_list[0].args[0] == ["/tmp/fsq-mac", "element", "inspect"]
+
+    @patch("src.repair.strategies.time.sleep")
+    @patch("src.repair.strategies.subprocess.run")
+    def test_stale_locator_retries_after_inspect(self, mock_run, _mock_sleep):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout='{"ok": true}', stderr=""),
+            MagicMock(returncode=0, stdout="ok", stderr=""),
+        ]
+        strategy = RetryStrategy(max_retries=1, backoff_ms=1)
+        step = build_failed_step(
+            action="element_click",
+            command=["mac", "element", "click", "--name", "Submit"],
+            classification=FailureClassification.OBSERVATION_INSUFFICIENT,
+            fsq_error_code="ELEMENT_REFERENCE_STALE",
+            fsq_retryable=True,
+        )
+
+        result = strategy.apply(step, {})
+
+        assert result.success is True
+        assert mock_run.call_args_list[0].args[0] == ["mac", "element", "inspect"]
+        assert mock_run.call_args_list[1].args[0] == ["mac", "element", "click", "--name", "Submit"]
+
+
+class TestRestartStrategy:
+    @patch("src.repair.strategies.time.sleep")
+    @patch("src.repair.strategies.subprocess.run")
+    def test_backend_unavailable_runs_doctor_before_restart(self, mock_run, _mock_sleep):
+        mock_run.side_effect = [
+            MagicMock(returncode=0, stdout="backend ok", stderr=""),
+            MagicMock(returncode=0, stdout="ended", stderr=""),
+            MagicMock(returncode=0, stdout='{"ok": true}', stderr=""),
+            MagicMock(returncode=0, stdout="ok", stderr=""),
+        ]
+        strategy = RestartStrategy(mac_cli="mac")
+        step = build_failed_step(
+            action="element_click",
+            command=["mac", "element", "click", "--name", "Submit"],
+            classification=FailureClassification.ENVIRONMENT_FAILURE,
+            fsq_error_code="BACKEND_UNAVAILABLE",
+            fsq_retryable=True,
+        )
+
+        result = strategy.apply(step, {})
+
+        assert result.success is True
+        commands = [call.args[0] for call in mock_run.call_args_list]
+        assert commands[0] == ["mac", "doctor", "backend"]
+        assert commands[1] == ["mac", "session", "end"]
+        assert commands[2] == ["mac", "session", "start"]
+        assert commands[3] == ["mac", "element", "click", "--name", "Submit"]
+
+    @patch("src.repair.strategies.subprocess.run")
+    def test_backend_doctor_failure_short_circuits_restart(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="doctor failed")
+        strategy = RestartStrategy(mac_cli="mac")
+        step = build_failed_step(
+            action="element_click",
+            command=["mac", "element", "click", "--name", "Submit"],
+            classification=FailureClassification.ENVIRONMENT_FAILURE,
+            fsq_error_code="BACKEND_UNAVAILABLE",
+            fsq_retryable=True,
+        )
+
+        result = strategy.apply(step, {})
+
+        assert result.success is False
+        assert "Backend doctor failed" in result.details
+        assert mock_run.call_count == 1
 
 
 class TestSkipStrategy:

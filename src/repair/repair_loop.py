@@ -53,7 +53,7 @@ class RepairLoop:
 
         # Strategy chain ordered by priority
         self.strategies: List[RepairStrategyBase] = [
-            RetryStrategy(max_retries=2),
+            RetryStrategy(max_retries=2, mac_cli=mac_cli),
             RestartStrategy(mac_cli=mac_cli),
             ReplanStrategy(),
             SkipStrategy(),

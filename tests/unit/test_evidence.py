@@ -46,6 +46,30 @@ class TestStepEvidence:
         assert data["artifacts"][0]["path"] == "screenshots/before.png"
         assert data["artifacts"][1]["path"] == "screenshots/after.png"
 
+    def test_cli_command_serialization_includes_structured_success_fields(self):
+        step = StepEvidence(
+            step_id="s4",
+            action="element_click",
+            status=StepStatus.SUCCESS,
+            cli_command=CLICommand(
+                command=["mac", "element", "click", "--name", "OK"],
+                exit_code=0,
+                session_id="s1",
+                resolved_element={"ref": "e7"},
+                snapshot={"snapshot_id": "snap-1", "elements": []},
+                actionability_used={"actionable": True, "checks": {}},
+                upstream_duration_ms=321,
+            ),
+        )
+
+        data = step.to_dict()
+
+        assert data["cli_command"]["session_id"] == "s1"
+        assert data["cli_command"]["resolved_element"] == {"ref": "e7"}
+        assert data["cli_command"]["snapshot"] == {"snapshot_id": "snap-1", "elements": []}
+        assert data["cli_command"]["actionability_used"] == {"actionable": True, "checks": {}}
+        assert data["cli_command"]["upstream_duration_ms"] == 321
+
 
 class TestRunEvidence:
     def test_create_run_evidence(self):
@@ -169,6 +193,40 @@ class TestEvidenceStorage:
             assert loaded is not None
             assert loaded.started_at.tzinfo == timezone.utc
             assert loaded.finished_at.tzinfo == timezone.utc
+
+    def test_save_and_load_preserves_structured_success_fields(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = EvidenceStorage(Path(tmpdir))
+            evidence = storage.create_run("plan-structured-success")
+            evidence.steps.append(
+                StepEvidence(
+                    step_id="s1",
+                    action="element_click",
+                    status=StepStatus.SUCCESS,
+                    cli_command=CLICommand(
+                        command=["mac", "element", "click", "--name", "OK"],
+                        exit_code=0,
+                        session_id="s1",
+                        resolved_element={"ref": "e7"},
+                        snapshot={"snapshot_id": "snap-1", "elements": []},
+                        actionability_used={"actionable": True, "checks": {}},
+                        upstream_duration_ms=321,
+                    ),
+                )
+            )
+            evidence.finalize()
+
+            storage.save_evidence(evidence)
+            loaded = storage.load_evidence(evidence.run_id)
+
+            assert loaded is not None
+            cli = loaded.steps[0].cli_command
+            assert cli is not None
+            assert cli.session_id == "s1"
+            assert cli.resolved_element == {"ref": "e7"}
+            assert cli.snapshot == {"snapshot_id": "snap-1", "elements": []}
+            assert cli.actionability_used == {"actionable": True, "checks": {}}
+            assert cli.upstream_duration_ms == 321
 
 
 class TestEvidenceCollector:

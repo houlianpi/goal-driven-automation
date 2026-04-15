@@ -63,6 +63,11 @@ class CLICommand:
     stderr: str = ""
     duration_ms: int = 0
     parsed_response: Optional[Dict[str, Any]] = None
+    session_id: Optional[str] = None
+    resolved_element: Optional[Dict[str, Any]] = None
+    snapshot: Optional[Dict[str, Any]] = None
+    actionability_used: Optional[Dict[str, Any]] = None
+    upstream_duration_ms: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         result = {
@@ -74,6 +79,16 @@ class CLICommand:
         }
         if self.parsed_response is not None:
             result["parsed_response"] = self.parsed_response
+        if self.session_id is not None:
+            result["session_id"] = self.session_id
+        if self.resolved_element is not None:
+            result["resolved_element"] = self.resolved_element
+        if self.snapshot is not None:
+            result["snapshot"] = self.snapshot
+        if self.actionability_used is not None:
+            result["actionability_used"] = self.actionability_used
+        if self.upstream_duration_ms is not None:
+            result["upstream_duration_ms"] = self.upstream_duration_ms
         return result
 
 

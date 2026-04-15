@@ -360,6 +360,17 @@ class TestV030Compatibility:
         result = compiler.compile_step(step)
         assert result["argv"] == ["mac", "element", "find", "Save"]
 
+    def test_element_find_first_match_true_emits_flag(self):
+        """element find should emit --first-match when requested."""
+        compiler = Compiler()
+        step = {
+            "step_id": "s1",
+            "action": "element_find",
+            "args": {"locator": "Save", "first_match": True},
+        }
+        result = compiler.compile_step(step)
+        assert result["argv"] == ["mac", "element", "find", "Save", "--first-match"]
+
     def test_element_drag_uses_two_positional_refs(self):
         """element drag takes source and target as positional args."""
         compiler = Compiler()

@@ -97,6 +97,11 @@ class Compiler:
             verb = self._ASSERT_ACTIONS[capability_action]
             argv = self._build_assert_argv(verb, compiled_args)
             command = " ".join(shlex.quote(a) for a in argv)
+        elif capability_action == "element_find":
+            argv = ["mac", "element", "find", str(compiled_args["locator"])]
+            if compiled_args.get("first_match"):
+                argv.append("--first-match")
+            command = " ".join(shlex.quote(a) for a in argv)
         else:
             command = self._compile_template(action_def["compile_to"], compiled_args)
             argv = self._compile_argv(command)

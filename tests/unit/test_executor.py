@@ -322,3 +322,69 @@ class TestV030JsonEnvelope:
         )
         from src.evidence.types import FailureClassification
         assert executor._classify_failure(step_result) == FailureClassification.ENVIRONMENT_FAILURE
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_step_extracts_structured_success_evidence(self, mock_run):
+        envelope = (
+            '{"ok": true, "command": "element.click", "session_id": "s1", '
+            '"data": {'
+            '"resolved_element": {"ref": "e7", "role": "AXButton", "name": "OK"}, '
+            '"snapshot": {"snapshot_id": "snap-1", "elements": [{"ref": "e7"}]}, '
+            '"actionability_used": {"actionable": true, "checks": {"visible": true}}'
+            '}, "error": null, "meta": {"duration_ms": 321}}'
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=envelope, stderr="")
+
+        executor = Executor()
+        executor._session_bootstrapped = True
+        step = {
+            "step_id": "s-success",
+            "command": "mac element click --name OK",
+            "argv": ["echo", "test"],
+            "retry_policy": {"max_attempts": 1},
+        }
+
+        result = executor.execute_step(step)
+
+        assert result.success is True
+        assert result.evidence["session_id"] == "s1"
+        assert result.evidence["resolved_element"] == {"ref": "e7", "role": "AXButton", "name": "OK"}
+        assert result.evidence["snapshot"] == {"snapshot_id": "snap-1", "elements": [{"ref": "e7"}]}
+        assert result.evidence["actionability_used"] == {"actionable": True, "checks": {"visible": True}}
+        assert result.evidence["upstream_duration_ms"] == 321
+
+    @patch("src.executor.executor.subprocess.run")
+    def test_execute_populates_cli_command_structured_success_fields(self, mock_run):
+        envelope = (
+            '{"ok": true, "command": "element.click", "session_id": "s1", '
+            '"data": {'
+            '"resolved_element": {"ref": "e7"}, '
+            '"snapshot": {"snapshot_id": "snap-1", "elements": []}, '
+            '"actionability_used": {"actionable": true, "checks": {}}'
+            '}, "error": null, "meta": {"duration_ms": 321}}'
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout=envelope, stderr="")
+
+        executor = Executor()
+        executor._session_bootstrapped = True
+        plan = {
+            "plan_id": "plan-success-evidence",
+            "steps": [
+                {
+                    "step_id": "s1",
+                    "action": "element_click",
+                    "command": "mac element click --name OK",
+                    "argv": ["echo", "test"],
+                }
+            ],
+        }
+
+        evidence = executor.execute(plan)
+        step_ev = evidence.steps[0]
+
+        assert step_ev.cli_command is not None
+        assert step_ev.cli_command.session_id == "s1"
+        assert step_ev.cli_command.resolved_element == {"ref": "e7"}
+        assert step_ev.cli_command.snapshot == {"snapshot_id": "snap-1", "elements": []}
+        assert step_ev.cli_command.actionability_used == {"actionable": True, "checks": {}}
+        assert step_ev.cli_command.upstream_duration_ms == 321

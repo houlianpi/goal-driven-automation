@@ -4,6 +4,39 @@
 
 schema_version: "1.0"
 
+supported_contract_actions:
+  - app.activate
+  - app.launch
+  - app.terminate
+  - assert.app-frontmost
+  - assert.app-running
+  - assert.enabled
+  - assert.text
+  - assert.value
+  - assert.visible
+  - capture.screenshot
+  - capture.ui-tree
+  - element.click
+  - element.double-click
+  - element.drag
+  - element.find
+  - element.hover
+  - element.inspect
+  - element.right-click
+  - element.scroll
+  - element.type
+  - input.click-at
+  - input.hotkey
+  - input.key
+  - input.text
+  - menu.click
+  - session.end
+  - session.start
+  - wait.app
+  - wait.element
+  - wait.window
+  - window.focus
+
 actions:
   # ============================================================
   # SESSION MANAGEMENT
