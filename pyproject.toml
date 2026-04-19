@@ -35,6 +35,7 @@ packages = [
   "src.evidence",
   "src.executor",
   "src.goal_interpreter",
+  "src.llm",
   "src.memory",
   "src.pipeline",
   "src.planner",
