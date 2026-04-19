@@ -83,16 +83,49 @@ def test_main_routes_run_command(monkeypatch, tmp_path: Path) -> None:
 
 def test_main_routes_record_command(monkeypatch, tmp_path: Path) -> None:
     output_path = tmp_path / "cases" / "recorded.yaml"
-    planned_case = CaseFile(
-        meta=CaseMeta(goal="登录 GitHub", app="Safari", created="2026-04-19T14:30:00Z"),
-        steps=[Step(action="tap", target="Sign in")],
-    )
-    saved: list[tuple[CaseFile, Path]] = []
+    recorded: list[tuple[str, str, Path, int]] = []
 
-    monkeypatch.setattr("src.cli.main._plan_case", lambda goal, app, max_cycles, llm_client=None: planned_case)
-    monkeypatch.setattr("src.cli.main.save_case", lambda case, path: saved.append((case, path)))
+    monkeypatch.setattr(
+        "src.cli.main.record_goal",
+        lambda goal, app, output_path, max_cycles, llm_client: recorded.append(
+            (goal, app, output_path, max_cycles)
+        ),
+    )
+    monkeypatch.setattr("src.cli.main._default_llm_client", lambda: lambda prompt: prompt)
 
     exit_code = main(["record", "登录 GitHub", "-o", str(output_path)])
 
     assert exit_code == 0
-    assert saved == [(planned_case, output_path)]
+    assert recorded == [("登录 GitHub", "Safari", output_path, 10)]
+
+
+def test_main_routes_fix_command(monkeypatch, tmp_path: Path) -> None:
+    case_path = tmp_path / "cases" / "failed.yaml"
+    called: list[Path] = []
+
+    monkeypatch.setattr("src.cli.main.fix_case", lambda path, llm_client: called.append(path) or True)
+    monkeypatch.setattr("src.cli.main._default_fix_llm_client", lambda: lambda prompt: prompt)
+
+    exit_code = main(["fix", str(case_path)])
+
+    assert exit_code == 0
+    assert called == [case_path]
+
+
+def test_main_routes_run_report_command(monkeypatch, tmp_path: Path) -> None:
+    cases_path = tmp_path / "cases"
+    report_path = tmp_path / "report.html"
+    results = [type("CaseResult", (), {"success": True})()]
+    generated: list[tuple[list[object], Path]] = []
+
+    class FakeReportGenerator:
+        def generate_report(self, incoming_results, output_path):
+            generated.append((incoming_results, output_path))
+
+    monkeypatch.setattr("src.cli.main.run_results_for_path", lambda path: results)
+    monkeypatch.setattr("src.cli.main.ReportGenerator", FakeReportGenerator)
+
+    exit_code = main(["run", str(cases_path), "--report", "html", "--output", str(report_path)])
+
+    assert exit_code == 0
+    assert generated == [(results, report_path)]

@@ -20,6 +20,11 @@ def load_case(path: str | Path) -> CaseFile:
     if not isinstance(data, dict):
         raise TypeError("case file root must be a mapping")
 
+    return parse_case_data(data)
+
+
+def parse_case_data(data: dict[str, Any]) -> CaseFile:
+    """Parse an in-memory YAML mapping into a case dataclass tree."""
     return _parse_case_file(data)
 
 
