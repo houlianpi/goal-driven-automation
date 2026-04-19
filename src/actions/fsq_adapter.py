@@ -16,7 +16,7 @@ from src.actions.action_space import ActionDefinition
 _PLACEHOLDER_PATTERN = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ExecutionResult:
     """Result of a single fsq-mac command execution."""
 

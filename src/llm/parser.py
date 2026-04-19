@@ -11,7 +11,7 @@ _RESPONSE_PATTERN = re.compile(r"<response\b[\s\S]*?</response>", re.IGNORECASE)
 _SUPPORTED_ACTION_TYPES = {"launch", "tap", "input", "hotkey", "assert", "wait"}
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class PlanningResponse:
     """Structured planning decision returned by the LLM."""
 
