@@ -32,6 +32,7 @@ packages = [
   "src.case",
   "src.compiler",
   "src.evaluator",
+  "src.engine",
   "src.evidence",
   "src.executor",
   "src.goal_interpreter",
