@@ -102,13 +102,35 @@ class Executor:
             runs_dir = Path(__file__).parent.parent.parent / "data" / "runs"
         self.runs_dir = runs_dir
         self.timeout_ms = timeout_ms
-        self.mac_cli = os.environ.get("FSQ_MAC_CLI", "mac")
+        self.mac_cli, self.mac_cli_prefix = self._resolve_mac_cli()
         self._session_bootstrapped = False
+
+    @staticmethod
+    def _resolve_mac_cli() -> tuple:
+        """Resolve the mac CLI executable.
+
+        Priority:
+        1. FSQ_MAC_CLI env var
+        2. Local sibling fsq-mac project (via ``uv run --project``)
+        3. Global ``mac`` on PATH
+        """
+        env = os.environ.get("FSQ_MAC_CLI")
+        if env:
+            return env, [env]
+
+        # Check for sibling fsq-mac dev checkout
+        project_root = Path(__file__).resolve().parent.parent.parent
+        fsq_mac_path = project_root.parent / "fsq-mac"
+        if fsq_mac_path.is_dir() and (fsq_mac_path / "pyproject.toml").exists():
+            prefix = ["uv", "run", "--project", str(fsq_mac_path), "mac"]
+            return "uv", prefix
+
+        return "mac", ["mac"]
 
     def _resolve_command(self, command: List[str]) -> List[str]:
         """Resolve logical CLI placeholders to concrete executables."""
         if command and command[0] == "mac":
-            return [self.mac_cli, *command[1:]]
+            return [*self.mac_cli_prefix, *command[1:]]
         return command
 
     # fsq-mac v0.3.0 error code → GDA classification mapping
@@ -174,20 +196,27 @@ class Executor:
         """Return True when the argv targets fsq-mac."""
         if not command:
             return False
-        return Path(command[0]).name == Path(self.mac_cli).name
+        prefix = self.mac_cli_prefix
+        if len(command) >= len(prefix):
+            return command[:len(prefix)] == prefix
+        return Path(command[0]).name == "mac"
 
     def _requires_session(self, command: List[str]) -> bool:
         """Return True when the fsq-mac command expects an active session."""
-        if not self._is_mac_command(command) or len(command) < 2:
+        if not self._is_mac_command(command):
             return False
-        return command[1] not in {"session", "doctor"}
+        prefix_len = len(self.mac_cli_prefix)
+        if len(command) <= prefix_len:
+            return False
+        subcommand = command[prefix_len]
+        return subcommand not in {"session", "doctor"}
 
     def _ensure_session_started(self) -> Optional[Dict[str, Any]]:
         """Start a session once per plan before session-bound commands."""
         if self._session_bootstrapped:
             return None
 
-        result = self.execute_command([self.mac_cli, "session", "start"], timeout_ms=30000)
+        result = self.execute_command([*self.mac_cli_prefix, "session", "start"], timeout_ms=30000)
         if result["return_code"] == 0:
             self._session_bootstrapped = True
         return result
@@ -289,10 +318,11 @@ class Executor:
             parsed = self._parse_fsq_response(result["stdout"])
             last_parsed = parsed
 
-            if len(argv) >= 3 and argv[1] == "session":
-                if argv[2] == "start" and result["return_code"] == 0:
+            prefix_len = len(self.mac_cli_prefix)
+            if len(argv) >= prefix_len + 2 and argv[:prefix_len] == self.mac_cli_prefix and argv[prefix_len] == "session":
+                if argv[prefix_len + 1] == "start" and result["return_code"] == 0:
                     self._session_bootstrapped = True
-                elif argv[2] == "end" and result["return_code"] == 0:
+                elif argv[prefix_len + 1] == "end" and result["return_code"] == 0:
                     self._session_bootstrapped = False
 
             # Determine success: prefer JSON ok field, fall back to return_code
