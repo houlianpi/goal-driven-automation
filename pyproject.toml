@@ -14,6 +14,9 @@ dependencies = [
   "Pillow>=10.0",
 ]
 
+[project.scripts]
+gda = "src.cli.main:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.0",
@@ -27,12 +30,18 @@ testpaths = ["tests"]
 [tool.setuptools]
 packages = [
   "src",
+  "src.actions",
   "src.assets",
+  "src.cache",
+  "src.case",
+  "src.cli",
   "src.compiler",
   "src.evaluator",
+  "src.engine",
   "src.evidence",
   "src.executor",
   "src.goal_interpreter",
+  "src.llm",
   "src.memory",
   "src.pipeline",
   "src.planner",
