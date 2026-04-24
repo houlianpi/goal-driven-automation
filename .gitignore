@@ -22,6 +22,7 @@ Thumbs.db
 # Test artifacts
 *.log
 test-results/
+qa-screenshots/
 
 # Local log directories
 log/
