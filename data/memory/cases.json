@@ -15,7 +15,7 @@
       "failure_count": 0,
       "confidence": 1.0,
       "last_used": null,
-      "created_at": "2026-04-09T06:47:52.262138",
+      "created_at": "2026-04-09T06:47:52.262138+00:00",
       "tags": [
         "hotkey",
         "launch_app"
@@ -37,10 +37,50 @@
       "failure_count": 0,
       "confidence": 1.0,
       "last_used": null,
-      "created_at": "2026-04-09T06:48:03.460050",
+      "created_at": "2026-04-09T06:48:03.460050+00:00",
       "tags": [
         "assert_visible",
         "launch_app"
+      ],
+      "metadata": {}
+    },
+    {
+      "case_id": "case-bdb1c2582403",
+      "case_type": "repair_case",
+      "pattern": {
+        "action": "launch",
+        "error_type": "precondition_missing",
+        "repair_strategy": "skip"
+      },
+      "success_count": 1,
+      "failure_count": 0,
+      "confidence": 1.0,
+      "last_used": null,
+      "created_at": "2026-04-15T02:57:03.286335+00:00",
+      "tags": [
+        "launch",
+        "precondition_missing",
+        "skip"
+      ],
+      "metadata": {}
+    },
+    {
+      "case_id": "case-c79128138516",
+      "case_type": "repair_case",
+      "pattern": {
+        "action": "launch",
+        "error_type": "environment_failure",
+        "repair_strategy": "retry"
+      },
+      "success_count": 1,
+      "failure_count": 0,
+      "confidence": 1.0,
+      "last_used": null,
+      "created_at": "2026-04-15T03:02:17.879005+00:00",
+      "tags": [
+        "launch",
+        "environment_failure",
+        "retry"
       ],
       "metadata": {}
     }
